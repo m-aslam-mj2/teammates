@@ -11,7 +11,6 @@ import teammates.common.datatransfer.attributes.InstructorAttributes;
 import teammates.common.util.AppUrl;
 import teammates.common.util.Const;
 import teammates.common.util.FieldValidator;
-import teammates.common.util.Url;
 import teammates.test.driver.BackDoor;
 import teammates.test.pageobjects.InstructorCourseDetailsPage;
 import teammates.test.pageobjects.InstructorCourseEditPage;
@@ -21,9 +20,9 @@ import teammates.test.pageobjects.InstructorHelpPage;
 import teammates.test.pageobjects.InstructorHomePage;
 
 /**
- * SUT: {@link Const.ActionURIs#INSTRUCTOR_HOME_PAGE}.
+ * SUT: {@link Const.WebPageURIs#INSTRUCTOR_HOME_PAGE}.
  */
-public class InstructorHomePageUiTest extends BaseUiTestCase {
+public class InstructorHomePageUiTest extends BaseLegacyUiTestCase {
     private InstructorHomePage homePage;
 
     private FeedbackSessionAttributes feedbackSessionAwaiting;
@@ -60,7 +59,6 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         testCourseLinks();
         testSearchAction();
         testSortAction();
-        testDownloadAction();
         testRemindActions();
         testPublishUnpublishResendLinkActions();
         testArchiveCourseAction();
@@ -92,7 +90,7 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         ______TS("login");
 
         loginAsNewInstructor();
-        assertTrue(browser.driver.getCurrentUrl().contains(Const.ActionURIs.INSTRUCTOR_HOME_PAGE));
+        assertTrue(browser.driver.getCurrentUrl().contains(Const.WebPageURIs.INSTRUCTOR_HOME_PAGE));
     }
 
     private void testShowFeedbackStatsLink() throws Exception {
@@ -129,13 +127,16 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         homePage.verifyHtmlMainContent("/instructorHomeNewInstructorWithoutSampleCourse.html");
 
         CourseAttributes newCourse = CourseAttributes
-                .builder("newIns.wit-demo", "Sample Course 101", ZoneId.of("UTC"))
+                .builder("newIns.wit-demo")
+                .withName("Sample Course 101")
+                .withTimezone(ZoneId.of("UTC"))
                 .build();
         BackDoor.createCourse(newCourse);
         @SuppressWarnings("deprecation")
         InstructorAttributes instr = InstructorAttributes
-                .builder("CHomeUiT.instructor.tmms.new", "newIns.wit-demo",
-                        "Teammates Test New Instructor With Sample", "CHomeUiT.instructor.tmms@gmail.tmt")
+                .builder("newIns.wit-demo", "CHomeUiT.instructor.tmms@gmail.tmt")
+                .withName("Teammates Test New Instructor With Sample")
+                .withGoogleId("CHomeUiT.instructor.tmms.new")
                 .build();
         BackDoor.createInstructor(instr);
 
@@ -184,7 +185,7 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         ______TS("link: course enroll");
         InstructorCourseEnrollPage enrollPage = homePage.clickCourseEnrollLink(courseId);
         enrollPage.verifyContains("Enroll Students for CHomeUiT.CS1101");
-        String expectedEnrollLinkText = createUrl(Const.ActionURIs.INSTRUCTOR_COURSE_ENROLL_PAGE)
+        String expectedEnrollLinkText = createUrl(Const.WebPageURIs.INSTRUCTOR_COURSE_ENROLL_PAGE)
                                         .withCourseId(courseId)
                                         .withUserId(instructorId)
                                         .toAbsoluteString();
@@ -194,7 +195,7 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         ______TS("link: course view");
         InstructorCourseDetailsPage detailsPage = homePage.clickCourseViewLink(courseId);
         detailsPage.verifyContains("Course Details");
-        String expectedViewLinkText = createUrl(Const.ActionURIs.INSTRUCTOR_COURSE_DETAILS_PAGE)
+        String expectedViewLinkText = createUrl(Const.WebPageURIs.INSTRUCTOR_COURSE_DETAILS_PAGE)
                                         .withCourseId(courseId)
                                         .withUserId(instructorId)
                                         .toAbsoluteString();
@@ -204,7 +205,7 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         ______TS("link: course edit");
         InstructorCourseEditPage editPage = homePage.clickCourseEditLink(courseId);
         editPage.verifyContains("Edit Course Details");
-        String expectedEditLinkText = createUrl(Const.ActionURIs.INSTRUCTOR_COURSE_EDIT_PAGE)
+        String expectedEditLinkText = createUrl(Const.WebPageURIs.INSTRUCTOR_COURSE_EDIT_PAGE)
                                         .withCourseId(courseId)
                                         .withUserId(instructorId)
                                         .toAbsoluteString();
@@ -214,43 +215,13 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         ______TS("link: course add session");
         InstructorFeedbackSessionsPage feedbacksPage = homePage.clickCourseAddEvaluationLink(courseId);
         feedbacksPage.verifyContains("Add New Feedback Session");
-        String expectedAddSessionLinkText = createUrl(Const.ActionURIs.INSTRUCTOR_FEEDBACK_SESSIONS_PAGE)
+        String expectedAddSessionLinkText = createUrl(Const.WebPageURIs.INSTRUCTOR_SESSIONS_PAGE)
                                         .withUserId(instructorId)
                                         .withCourseId(courseId)
                                         .toAbsoluteString();
         assertEquals(expectedAddSessionLinkText, browser.driver.getCurrentUrl());
         homePage.goToPreviousPage(InstructorHomePage.class);
 
-    }
-
-    private void testDownloadAction() throws Exception {
-
-        // Test that download result button exist in homePage
-        homePage.verifyDownloadResultButtonExists(feedbackSessionClosed.getCourseId(),
-                feedbackSessionClosed.getFeedbackSessionName());
-
-        ______TS("Typical case: download report");
-
-        AppUrl reportUrl = createUrl(Const.ActionURIs.INSTRUCTOR_FEEDBACK_RESULTS_DOWNLOAD)
-                .withUserId("CHomeUiT.instructor.tmms")
-                .withCourseId(feedbackSessionClosed.getCourseId())
-                .withSessionName(feedbackSessionClosed.getFeedbackSessionName());
-
-        homePage.verifyDownloadLink(reportUrl);
-
-        ______TS("Typical case: download report unsuccessfully due to missing parameters");
-
-        reportUrl = createUrl(Const.ActionURIs.INSTRUCTOR_FEEDBACK_RESULTS_DOWNLOAD)
-                .withUserId("CHomeUiT.instructor.tmms");
-        browser.driver.get(reportUrl.toAbsoluteString());
-        String afterReportDownloadUrl = browser.driver.getCurrentUrl();
-        assertFalse(reportUrl.toString().equals(afterReportDownloadUrl));
-        // Verify an error page is returned due to missing parameters in URL
-        assertTrue("Expected url is Unauthorised page, but is " + afterReportDownloadUrl,
-                        afterReportDownloadUrl.contains(Const.ViewURIs.UNAUTHORIZED));
-
-        // Redirect to the instructor home page after showing error page
-        loginAsCommonInstructor();
     }
 
     private void testRemindActions() {
@@ -453,8 +424,8 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
         //delete the course, then submit archive request to it
         BackDoor.deleteCourse(courseIdForCS2104);
         homePage.clickArchiveCourseLinkAndConfirm(courseIdForCS2104);
-        assertTrue(browser.driver.getCurrentUrl().contains(Url.addParamToUrl(Const.ViewURIs.UNAUTHORIZED,
-                Const.ParamsNames.ERROR_FEEDBACK_URL_REQUESTED, Const.ActionURIs.INSTRUCTOR_COURSE_ARCHIVE)));
+        // assertTrue(browser.driver.getCurrentUrl().contains(Url.addParamToUrl(Const.ViewURIs.UNAUTHORIZED,
+        //         Const.ParamsNames.ERROR_FEEDBACK_URL_REQUESTED, Const.ActionURIs.INSTRUCTOR_COURSE_ARCHIVE)));
         // recover the deleted course and its related entities
         testData = loadDataBundle("/InstructorHomePageUiTest2.json");
         removeAndRestoreDataBundle(testData);
@@ -602,18 +573,18 @@ public class InstructorHomePageUiTest extends BaseUiTestCase {
     }
 
     private void loginAsInstructor(String googleId) {
-        AppUrl editUrl = createUrl(Const.ActionURIs.INSTRUCTOR_HOME_PAGE)
+        AppUrl editUrl = createUrl(Const.WebPageURIs.INSTRUCTOR_HOME_PAGE)
                     .withUserId(googleId);
 
-        homePage = loginAdminToPage(editUrl, InstructorHomePage.class);
+        homePage = loginAdminToPageOld(editUrl, InstructorHomePage.class);
     }
 
     private void loginWithPersistenceProblem() {
-        AppUrl homeUrl = ((AppUrl) createUrl(Const.ActionURIs.INSTRUCTOR_HOME_PAGE)
+        AppUrl homeUrl = ((AppUrl) createUrl(Const.WebPageURIs.INSTRUCTOR_HOME_PAGE)
                     .withParam(Const.ParamsNames.CHECK_PERSISTENCE_COURSE, "something"))
                     .withUserId("unreg_user");
 
-        homePage = loginAdminToPage(homeUrl, InstructorHomePage.class);
+        homePage = loginAdminToPageOld(homeUrl, InstructorHomePage.class);
 
     }
 

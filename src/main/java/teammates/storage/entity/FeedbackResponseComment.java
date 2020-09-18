@@ -35,12 +35,18 @@ public class FeedbackResponseComment extends BaseEntity {
     /** The foreign key to locate the FeedbackQuestion object. */
     private String feedbackQuestionId;
 
-    /** The giver of the comment.
-     * It is email in case when comment giver is a student or instructor, and team name in case of team. */
+    /**
+     * The giver of the comment.
+     *
+     * <p>It is email in case when comment giver is a student or instructor, and team name in case of team.
+     */
     private String giverEmail;
 
-    /** Role of a comment giver.
-     * Can only be INSTRUCTORS, STUDENTS or TEAMS. */
+    /**
+     * Role of a comment giver.
+     *
+     * <p>Can only be INSTRUCTORS, STUDENTS or TEAMS.
+     */
     private FeedbackParticipantType commentGiverType;
 
     /** The foreign key to locate the FeedbackResponse object commented on. */
@@ -97,8 +103,8 @@ public class FeedbackResponseComment extends BaseEntity {
         setCommentText(SanitizationHelper.sanitizeForRichText(commentText));
         this.giverSection = giverSection;
         this.receiverSection = receiverSection;
-        this.showCommentTo = showCommentTo == null ? new ArrayList<FeedbackParticipantType>() : showCommentTo;
-        this.showGiverNameTo = showGiverNameTo == null ? new ArrayList<FeedbackParticipantType>() : showGiverNameTo;
+        this.showCommentTo = showCommentTo == null ? new ArrayList<>() : showCommentTo;
+        this.showGiverNameTo = showGiverNameTo == null ? new ArrayList<>() : showGiverNameTo;
         this.isVisibilityFollowingFeedbackQuestion = isVisibilityFollowingFeedbackQuestion;
         this.lastEditorEmail = lastEditorEmail == null ? giverEmail : lastEditorEmail;
         this.lastEditedAt = lastEditedAt == null ? this.createdAt : lastEditedAt;
@@ -137,7 +143,14 @@ public class FeedbackResponseComment extends BaseEntity {
         this.feedbackQuestionId = feedbackQuestionId;
     }
 
-    public Boolean getIsVisibilityFollowingFeedbackQuestion() {
+    /**
+     * Gets whether the visibility setting of the comment follow the corresponding question.
+     */
+    public boolean getIsVisibilityFollowingFeedbackQuestion() {
+        if (this.isVisibilityFollowingFeedbackQuestion == null) {
+            // true as the default value if the field is null
+            return true;
+        }
         return this.isVisibilityFollowingFeedbackQuestion;
     }
 
@@ -159,6 +172,9 @@ public class FeedbackResponseComment extends BaseEntity {
         this.giverEmail = giverEmail;
     }
 
+    /**
+     * Gets the giver type of the comment.
+     */
     public FeedbackParticipantType getCommentGiverType() {
         // TODO: Remove after data migration
         if (commentGiverType == null) {
@@ -167,6 +183,9 @@ public class FeedbackResponseComment extends BaseEntity {
         return commentGiverType;
     }
 
+    /**
+     * Sets the giver type of the comment.
+     */
     public void setCommentGiverType(FeedbackParticipantType commentGiverType) {
         // TODO: Remove after data migration
         if (commentGiverType == null) {

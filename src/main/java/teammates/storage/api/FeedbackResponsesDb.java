@@ -3,23 +3,24 @@ package teammates.storage.api;
 import static com.googlecode.objectify.ObjectifyService.ofy;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.cmd.LoadType;
 import com.googlecode.objectify.cmd.Query;
-import com.googlecode.objectify.cmd.QueryKeys;
 
+import teammates.common.datatransfer.AttributesDeletionQuery;
 import teammates.common.datatransfer.attributes.FeedbackResponseAttributes;
+import teammates.common.exception.EntityAlreadyExistsException;
 import teammates.common.exception.EntityDoesNotExistException;
 import teammates.common.exception.InvalidParametersException;
 import teammates.common.util.Assumption;
 import teammates.common.util.Const;
-import teammates.common.util.Logger;
 import teammates.storage.entity.FeedbackResponse;
 
 /**
@@ -30,90 +31,60 @@ import teammates.storage.entity.FeedbackResponse;
  */
 public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackResponseAttributes> {
 
-    private static final Logger log = Logger.getLogger();
+    /**
+     * Gets a set of giver identifiers that has at least one response under a feedback session.
+     */
+    public Set<String> getGiverSetThatAnswerFeedbackSession(String courseId, String feedbackSessionName) {
+        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
+        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
 
-    public void createFeedbackResponses(Collection<FeedbackResponseAttributes> responsesToAdd)
-            throws InvalidParametersException {
-        List<FeedbackResponseAttributes> responsesToUpdate = createEntities(responsesToAdd);
-        for (FeedbackResponseAttributes response : responsesToUpdate) {
-            try {
-                updateFeedbackResponse(response);
-            } catch (EntityDoesNotExistException e) {
-                // This situation is not tested as replicating such a situation is
-                // difficult during testing
-                Assumption.fail("Entity found be already existing and not existing simultaneously");
+        List<Key<FeedbackResponse>> keysOfResponses =
+                load().filter("courseId =", courseId)
+                        .filter("feedbackSessionName =", feedbackSessionName)
+                        .keys()
+                        .list();
+
+        // the following process makes use of the key pattern of feedback response entity
+        // see generateId() in FeedbackResponse.java
+        Set<String> giverSet = new HashSet<>();
+        for (Key<FeedbackResponse> key : keysOfResponses) {
+            String[] tokens = key.getName().split("%");
+            if (tokens.length >= 3) {
+                giverSet.add(tokens[1]);
             }
         }
+
+        return giverSet;
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return Null if not found.
+     * Gets a feedback response.
      */
     public FeedbackResponseAttributes getFeedbackResponse(String feedbackResponseId) {
-        return makeAttributesOrNull(getFeedbackResponseEntityWithCheck(feedbackResponseId));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return Null if not found.
-     */
-    public FeedbackResponseAttributes getFeedbackResponse(
-            String feedbackQuestionId, String giverEmail, String receiverEmail) {
-        return makeAttributesOrNull(getFeedbackResponseEntityWithCheck(feedbackQuestionId, giverEmail, receiverEmail));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return Null if not found.
-     */
-    public FeedbackResponse getFeedbackResponseEntityWithCheck(String feedbackResponseId) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackResponseId);
 
         FeedbackResponse fr = getFeedbackResponseEntity(feedbackResponseId);
-        if (fr == null) {
-            log.info("Trying to get non-existent response: " + feedbackResponseId + ".");
-            return null;
-        }
-        return fr;
+
+        return makeAttributesOrNull(fr);
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return Null if not found.
+     * Gets a feedback response by unique constraint question-giver-receiver.
      */
-    public FeedbackResponse getFeedbackResponseEntityWithCheck(
+    public FeedbackResponseAttributes getFeedbackResponse(
             String feedbackQuestionId, String giverEmail, String receiverEmail) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackQuestionId);
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, giverEmail);
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, receiverEmail);
 
-        FeedbackResponse fr = getFeedbackResponseEntity(feedbackQuestionId, giverEmail, receiverEmail);
-        if (fr == null) {
-            log.warning("Trying to get non-existent response: " + feedbackQuestionId + "/" + "from: " + giverEmail
-                    + " to: " + receiverEmail);
-            return null;
-        }
-        return fr;
+        FeedbackResponse fr =
+                getFeedbackResponseEntity(FeedbackResponse.generateId(feedbackQuestionId, giverEmail, receiverEmail));
+
+        return makeAttributesOrNull(fr);
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return Null if not found.
-     */
-    public FeedbackResponse getFeedbackResponseEntityOptimized(FeedbackResponseAttributes response) {
-        return getEntity(response);
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all feedback responses of a question in a specific section.
      */
     public List<FeedbackResponseAttributes> getFeedbackResponsesForQuestionInSection(
             String feedbackQuestionId, String section) {
@@ -124,33 +95,29 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all feedback responses for a question.
      */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForQuestion(
-            String feedbackQuestionId) {
+    public List<FeedbackResponseAttributes> getFeedbackResponsesForQuestion(String feedbackQuestionId) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackQuestionId);
 
         return makeAttributes(getFeedbackResponseEntitiesForQuestion(feedbackQuestionId));
     }
 
     /**
-     * Finds the responses for a specified question within a given range.
-     *
-     * @return An empty list if no such responses are found.
+     * Checks whether there are responses for a question.
      */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForQuestionWithinRange(
-            String feedbackQuestionId, int range) {
+    public boolean areThereResponsesForQuestion(String feedbackQuestionId) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackQuestionId);
 
-        return makeAttributes(getFeedbackResponseEntitiesForQuestionWithinRange(feedbackQuestionId, range));
+        return !load()
+                .filter("feedbackQuestionId =", feedbackQuestionId)
+                .limit(1)
+                .list()
+                .isEmpty();
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all responses of a feedback session in a course.
      */
     public List<FeedbackResponseAttributes> getFeedbackResponsesForSession(
             String feedbackSessionName, String courseId) {
@@ -161,22 +128,7 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForSessionWithinRange(
-            String feedbackSessionName, String courseId, int range) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-
-        return makeAttributes(getFeedbackResponseEntitiesForSessionWithinRange(feedbackSessionName, courseId, range));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all responses given to/from a section in a feedback session in a course.
      */
     public List<FeedbackResponseAttributes> getFeedbackResponsesForSessionInSection(
             String feedbackSessionName, String courseId, String section) {
@@ -188,113 +140,7 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForSessionFromSection(
-            String feedbackSessionName, String courseId, String section) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, section);
-
-        return makeAttributes(getFeedbackResponseEntitiesForSessionFromSection(feedbackSessionName, courseId, section));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForSessionToSection(
-            String feedbackSessionName, String courseId, String section) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, section);
-
-        return makeAttributes(getFeedbackResponseEntitiesForSessionToSection(feedbackSessionName, courseId, section));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForSessionInSectionWithinRange(
-            String feedbackSessionName, String courseId, String section, int range) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, section);
-
-        return makeAttributes(
-                getFeedbackResponseEntitiesForSessionInSectionWithinRange(
-                        feedbackSessionName, courseId, section, range));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForSessionFromSectionWithinRange(
-            String feedbackSessionName, String courseId, String section, int range) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, section);
-
-        return makeAttributes(
-                getFeedbackResponseEntitiesForSessionFromSectionWithinRange(
-                        feedbackSessionName, courseId, section, range));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForSessionToSectionWithinRange(
-            String feedbackSessionName, String courseId, String section, int range) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, section);
-
-        return makeAttributes(
-                getFeedbackResponseEntitiesForSessionToSectionWithinRange(
-                        feedbackSessionName, courseId, section, range));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForReceiverForQuestion(
-            String feedbackQuestionId, String receiver) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackQuestionId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, receiver);
-
-        return makeAttributes(getFeedbackResponseEntitiesForReceiverForQuestion(feedbackQuestionId, receiver));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
-     */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesForReceiverForQuestionInSection(
-            String feedbackQuestionId, String receiver, String section) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackQuestionId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, receiver);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, section);
-
-        return makeAttributes(
-                getFeedbackResponseEntitiesForReceiverForQuestionInSection(feedbackQuestionId, receiver, section));
-    }
-
-    /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all responses given by a user for a question.
      */
     public List<FeedbackResponseAttributes> getFeedbackResponsesFromGiverForQuestion(
             String feedbackQuestionId, String giverEmail) {
@@ -305,39 +151,36 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all responses received by a user for a question.
      */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesFromGiverForQuestionInSection(
-            String feedbackQuestionId, String giverEmail, String section) {
+    public List<FeedbackResponseAttributes> getFeedbackResponsesForReceiverForQuestion(
+            String feedbackQuestionId, String receiver) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackQuestionId);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, giverEmail);
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, section);
+        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, receiver);
 
-        return makeAttributes(
-                getFeedbackResponseEntitiesFromGiverForQuestionInSection(feedbackQuestionId, giverEmail, section));
+        return makeAttributes(getFeedbackResponseEntitiesForReceiverForQuestion(feedbackQuestionId, receiver));
     }
 
     /**
-     *  Preconditions: <br>
-     * * All parameters are non-null.
-     *  @return An empty list if no such responses are found.
+     * Checks whether a user has responses in a session.
      */
-    public List<FeedbackResponseAttributes> getFeedbackResponsesFromGiverForSessionWithinRange(
-            String giverEmail, String feedbackSessionName, String courseId, int range) {
+    public boolean hasResponsesFromGiverInSession(
+            String giverEmail, String feedbackSessionName, String courseId) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, giverEmail);
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, feedbackSessionName);
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
 
-        return makeAttributes(getFeedbackResponseEntitiesFromGiverForSessionWithinRange(
-                giverEmail, feedbackSessionName, courseId, range));
+        return !load()
+                .filter("giverEmail =", giverEmail)
+                .filter("feedbackSessionName =", feedbackSessionName)
+                .filter("courseId =", courseId)
+                .limit(1)
+                .list()
+                .isEmpty();
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all responses given to a user in a course.
      */
     public List<FeedbackResponseAttributes> getFeedbackResponsesForReceiverForCourse(
             String courseId, String receiver) {
@@ -348,9 +191,7 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
     }
 
     /**
-     * Preconditions: <br>
-     * * All parameters are non-null.
-     * @return An empty list if no such responses are found.
+     * Gets all responses given by a user in a course.
      */
     public List<FeedbackResponseAttributes> getFeedbackResponsesFromGiverForCourse(
             String courseId, String giverEmail) {
@@ -361,90 +202,101 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
     }
 
     /**
-     * Updates the feedback response identified by {@code newAttributes.getId()} and
-     *   changes the {@code updatedAt} timestamp to be the time of update.
-     * For the remaining parameters, the existing value is preserved
-     *   if the parameter is null (due to 'keep existing' policy).<br>
-     * Preconditions: <br>
-     * * {@code newAttributes.getId()} is non-null and correspond to an existing feedback response.
+     * Updates a feedback response with {@link FeedbackResponseAttributes.UpdateOptions}.
+     *
+     * <p>If the giver/recipient field is changed, the response is updated by recreating the response
+     * as question-giver-recipient is the primary key.
+     *
+     * @return updated feedback response
+     * @throws InvalidParametersException if attributes to update are not valid
+     * @throws EntityDoesNotExistException if the comment cannot be found
+     * @throws EntityAlreadyExistsException if the response cannot be updated
+     *         by recreation because of an existent response
      */
-    public void updateFeedbackResponse(FeedbackResponseAttributes newAttributes)
-            throws InvalidParametersException, EntityDoesNotExistException {
-        updateFeedbackResponse(newAttributes, false);
-    }
+    public FeedbackResponseAttributes updateFeedbackResponse(FeedbackResponseAttributes.UpdateOptions updateOptions)
+            throws EntityDoesNotExistException, InvalidParametersException, EntityAlreadyExistsException {
+        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, updateOptions);
 
-    /**
-     * Updates the feedback response identified by {@code newAttributes.getId()}
-     * For the remaining parameters, the existing value is preserved
-     *   if the parameter is null (due to 'keep existing' policy).<br>
-     * The timestamp for {@code updatedAt} is independent of the {@code newAttributes}
-     *   and depends on the value of {@code keepUpdateTimestamp}
-     * Preconditions: <br>
-     * * {@code newAttributes.getId()} is non-null and correspond to an existing feedback response.
-     */
-    public void updateFeedbackResponse(FeedbackResponseAttributes newAttributes, boolean keepUpdateTimestamp)
-            throws InvalidParametersException, EntityDoesNotExistException {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, newAttributes);
+        FeedbackResponse oldResponse = getFeedbackResponseEntity(updateOptions.getFeedbackResponseId());
+        if (oldResponse == null) {
+            throw new EntityDoesNotExistException(ERROR_UPDATE_NON_EXISTENT);
+        }
 
+        FeedbackResponseAttributes newAttributes = makeAttributes(oldResponse);
+        newAttributes.update(updateOptions);
+
+        newAttributes.sanitizeForSaving();
         if (!newAttributes.isValid()) {
             throw new InvalidParametersException(newAttributes.getInvalidityInfo());
         }
 
-        updateFeedbackResponseOptimized(newAttributes, getEntity(newAttributes), keepUpdateTimestamp);
+        if (newAttributes.recipient.equals(oldResponse.getRecipientEmail())
+                && newAttributes.giver.equals(oldResponse.getGiverEmail())) {
+
+            // update only if change
+            boolean hasSameAttributes =
+                    this.<String>hasSameValue(oldResponse.getGiverSection(), newAttributes.getGiverSection())
+                    && this.<String>hasSameValue(oldResponse.getRecipientSection(), newAttributes.getRecipientSection())
+                    && this.<String>hasSameValue(
+                            oldResponse.getResponseMetaData(), newAttributes.getSerializedFeedbackResponseDetail());
+            if (hasSameAttributes) {
+                log.info(String.format(
+                        OPTIMIZED_SAVING_POLICY_APPLIED, FeedbackResponse.class.getSimpleName(), updateOptions));
+                return newAttributes;
+            }
+
+            oldResponse.setGiverSection(newAttributes.giverSection);
+            oldResponse.setRecipientSection(newAttributes.recipientSection);
+            oldResponse.setAnswer(newAttributes.getSerializedFeedbackResponseDetail());
+
+            saveEntity(oldResponse);
+
+            return makeAttributes(oldResponse);
+        } else {
+            // need to recreate the entity
+            newAttributes = FeedbackResponseAttributes
+                    .builder(newAttributes.getFeedbackQuestionId(), newAttributes.getGiver(),
+                             newAttributes.getRecipient())
+                    .withCourseId(newAttributes.getCourseId())
+                    .withFeedbackSessionName(newAttributes.getFeedbackSessionName())
+                    .withResponseDetails(newAttributes.getResponseDetails())
+                    .withGiverSection(newAttributes.getGiverSection())
+                    .withRecipientSection(newAttributes.getRecipientSection())
+                    .build();
+            newAttributes = createEntity(newAttributes);
+            deleteEntity(Key.create(FeedbackResponse.class, oldResponse.getId()));
+
+            return newAttributes;
+        }
     }
 
     /**
-     * Optimized to take in FeedbackResponse entity if available, to prevent reading the entity again.
-     * Updates the feedback response identified by {@code newAttributes.getId()}
-     * For the remaining parameters, the existing value is preserved
-     *   if the parameter is null (due to 'keep existing' policy).<br>
-     * The timestamp for {@code updatedAt} is independent of the {@code newAttributes}
-     *   and depends on the value of {@code keepUpdateTimestamp}
-     * Preconditions: <br>
-     * * {@code newAttributes.getId()} is non-null and correspond to an existing feedback response.
+     * Deletes a feedback response.
      */
-    private void updateFeedbackResponseOptimized(FeedbackResponseAttributes newAttributes, FeedbackResponse fr,
-            boolean keepUpdateTimestamp) throws InvalidParametersException, EntityDoesNotExistException {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, newAttributes);
+    public void deleteFeedbackResponse(String responseId) {
+        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, responseId);
 
-        //TODO: Sanitize values and update tests accordingly
+        deleteEntity(Key.create(FeedbackResponse.class, responseId));
+    }
 
-        if (!newAttributes.isValid()) {
-            throw new InvalidParametersException(newAttributes.getInvalidityInfo());
+    /**
+     * Deletes responses using {@link AttributesDeletionQuery}.
+     */
+    public void deleteFeedbackResponses(AttributesDeletionQuery query) {
+        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, query);
+
+        Query<FeedbackResponse> entitiesToDelete = load().project();
+        if (query.isCourseIdPresent()) {
+            entitiesToDelete = entitiesToDelete.filter("courseId =", query.getCourseId());
+        }
+        if (query.isFeedbackSessionNamePresent()) {
+            entitiesToDelete = entitiesToDelete.filter("feedbackSessionName =", query.getFeedbackSessionName());
+        }
+        if (query.isQuestionIdPresent()) {
+            entitiesToDelete = entitiesToDelete.filter("feedbackQuestionId =", query.getQuestionId());
         }
 
-        if (fr == null) {
-            throw new EntityDoesNotExistException(ERROR_UPDATE_NON_EXISTENT + newAttributes.toString());
-        }
-
-        fr.keepUpdateTimestamp = keepUpdateTimestamp;
-        fr.setAnswer(newAttributes.responseMetaData);
-        fr.setRecipientEmail(newAttributes.recipient);
-        fr.setGiverSection(newAttributes.giverSection);
-        fr.setRecipientSection(newAttributes.recipientSection);
-
-        saveEntity(fr, newAttributes);
-    }
-
-    public void updateFeedbackResponseOptimized(FeedbackResponseAttributes newAttributes, FeedbackResponse fr)
-            throws InvalidParametersException, EntityDoesNotExistException {
-        updateFeedbackResponseOptimized(newAttributes, fr, false);
-    }
-
-    public void deleteFeedbackResponsesForCourse(String courseId) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-
-        deleteFeedbackResponsesForCourses(Arrays.asList(courseId));
-    }
-
-    public void deleteFeedbackResponsesForCourses(List<String> courseIds) {
-        Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseIds);
-
-        ofy().delete().keys(getFeedbackResponsesForCoursesQuery(courseIds).keys()).now();
-    }
-
-    private Query<FeedbackResponse> getFeedbackResponsesForCoursesQuery(List<String> courseIds) {
-        return load().filter("courseId in", courseIds);
+        deleteEntity(entitiesToDelete.keys().list().toArray(new Key<?>[0]));
     }
 
     /**
@@ -452,168 +304,67 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
      */
     public boolean hasFeedbackResponseEntitiesForCourse(String courseId) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, courseId);
-        return !getFeedbackResponseEntitiesForCourseWithinRange(courseId, 1).isEmpty();
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForCourseWithinRange(String courseId, int range) {
-        return load().filter("courseId =", courseId).limit(range).list();
+        return !load().filter("courseId =", courseId).limit(1).list().isEmpty();
     }
 
     private FeedbackResponse getFeedbackResponseEntity(String feedbackResponseId) {
         return load().id(feedbackResponseId).now();
     }
 
-    private FeedbackResponse getFeedbackResponseEntity(
-            String feedbackQuestionId, String giverEmail, String receiver) {
-        return load()
-                .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("giverEmail =", giverEmail)
-                .filter("receiver =", receiver)
-                .first().now();
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForQuestionInSection(
+    private Collection<FeedbackResponse> getFeedbackResponseEntitiesForQuestionInSection(
                 String feedbackQuestionId, String section) {
-        List<FeedbackResponse> feedbackResponses = new ArrayList<>();
+        List<FeedbackResponse> allResponses = new ArrayList<>();
 
-        feedbackResponses.addAll(load()
+        allResponses.addAll(load()
                 .filter("feedbackQuestionId =", feedbackQuestionId)
                 .filter("giverSection =", section)
                 .list());
-
-        feedbackResponses.addAll(load()
+        allResponses.addAll(load()
                 .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("giverSection =", section)
-                .filter("receiverSection =", "None")
-                .list());
-
-        feedbackResponses.addAll(load()
-                .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("giverSection =", "None")
                 .filter("receiverSection =", section)
                 .list());
 
-        return feedbackResponses;
+        return removeDuplicates(allResponses);
     }
 
     private List<FeedbackResponse> getFeedbackResponseEntitiesForQuestion(String feedbackQuestionId) {
-        return getFeedbackResponseEntitiesForQuestionWithinRange(feedbackQuestionId, -1);
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForQuestionWithinRange(String feedbackQuestionId, int range) {
         return load()
                 .filter("feedbackQuestionId =", feedbackQuestionId)
-                .limit(range + 1).list();
+                .list();
     }
 
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForSession(
-            String feedbackSessionName, String courseId) {
-        return getFeedbackResponseEntitiesForSessionWithinRange(feedbackSessionName, courseId, -1);
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForSessionWithinRange(
-            String feedbackSessionName, String courseId, int range) {
+    private List<FeedbackResponse> getFeedbackResponseEntitiesForSession(String feedbackSessionName, String courseId) {
         return load()
                 .filter("feedbackSessionName =", feedbackSessionName)
                 .filter("courseId =", courseId)
-                .limit(range + 1).list();
+                .list();
     }
 
     private Collection<FeedbackResponse> getFeedbackResponseEntitiesForSessionInSection(
             String feedbackSessionName, String courseId, String section) {
-        Map<String, FeedbackResponse> feedbackResponses = new HashMap<>();
+        List<FeedbackResponse> allResponse = new ArrayList<>();
 
-        for (FeedbackResponse result : getFeedbackResponseEntitiesForSessionFromSection(
-                feedbackSessionName, courseId, section)) {
-            feedbackResponses.put(result.getId(), result);
-        }
-
-        for (FeedbackResponse result : getFeedbackResponseEntitiesForSessionToSection(
-                feedbackSessionName, courseId, section)) {
-            feedbackResponses.put(result.getId(), result);
-        }
-
-        return feedbackResponses.values();
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForSessionFromSection(
-            String feedbackSessionName, String courseId, String section) {
-        return getFeedbackResponseEntitiesForSessionFromSectionWithinRange(feedbackSessionName, courseId, section, -1);
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForSessionToSection(
-            String feedbackSessionName, String courseId, String section) {
-        return getFeedbackResponseEntitiesForSessionToSectionWithinRange(feedbackSessionName, courseId, section, -1);
-    }
-
-    private Collection<FeedbackResponse> getFeedbackResponseEntitiesForSessionInSectionWithinRange(
-            String feedbackSessionName, String courseId, String section, int range) {
-        Map<String, FeedbackResponse> feedbackResponses = new HashMap<>();
-
-        for (FeedbackResponse result : getFeedbackResponseEntitiesForSessionFromSectionWithinRange(
-                feedbackSessionName, courseId, section, range)) {
-            feedbackResponses.put(result.getId(), result);
-        }
-
-        for (FeedbackResponse result : getFeedbackResponseEntitiesForSessionToSectionWithinRange(
-                feedbackSessionName, courseId, section, range)) {
-            feedbackResponses.put(result.getId(), result);
-        }
-
-        return feedbackResponses.values();
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForSessionFromSectionWithinRange(
-            String feedbackSessionName, String courseId, String section, int range) {
-        return load()
+        allResponse.addAll(load()
                 .filter("feedbackSessionName =", feedbackSessionName)
                 .filter("courseId =", courseId)
                 .filter("giverSection =", section)
-                .limit(range + 1).list();
-    }
+                .list());
 
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForSessionToSectionWithinRange(
-            String feedbackSessionName, String courseId, String section, int range) {
-        return load()
+        allResponse.addAll(load()
                 .filter("feedbackSessionName =", feedbackSessionName)
                 .filter("courseId =", courseId)
                 .filter("receiverSection =", section)
-                .limit(range + 1).list();
+                .list());
+
+        return removeDuplicates(allResponse);
     }
 
-    private List<FeedbackResponse> getFeedbackResponseEntitiesForReceiverForQuestion(
-            String feedbackQuestionId, String receiver) {
-        return load()
-                .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("receiver =", receiver)
-                .list();
-    }
-
-    private Collection<FeedbackResponse> getFeedbackResponseEntitiesForReceiverForQuestionInSection(
-            String feedbackQuestionId, String receiver, String section) {
-        Map<String, FeedbackResponse> feedbackResponses = new HashMap<>();
-
-        List<FeedbackResponse> firstQueryResponses = load()
-                .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("receiver =", receiver)
-                .filter("giverSection =", section)
-                .list();
-
-        for (FeedbackResponse response : firstQueryResponses) {
-            feedbackResponses.put(response.getId(), response);
+    private Collection<FeedbackResponse> removeDuplicates(Collection<FeedbackResponse> responses) {
+        Map<String, FeedbackResponse> uniqueResponses = new HashMap<>();
+        for (FeedbackResponse response : responses) {
+            uniqueResponses.put(response.getId(), response);
         }
-
-        List<FeedbackResponse> secondQueryResponses = load()
-                .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("receiver =", receiver)
-                .filter("receiverSection =", section)
-                .list();
-
-        for (FeedbackResponse response : secondQueryResponses) {
-            feedbackResponses.put(response.getId(), response);
-        }
-
-        return feedbackResponses.values();
+        return uniqueResponses.values();
     }
 
     private List<FeedbackResponse> getFeedbackResponseEntitiesFromGiverForQuestion(
@@ -624,40 +375,12 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
                 .list();
     }
 
-    private Collection<FeedbackResponse> getFeedbackResponseEntitiesFromGiverForQuestionInSection(
-            String feedbackQuestionId, String giverEmail, String section) {
-        Map<String, FeedbackResponse> feedbackResponses = new HashMap<>();
-
-        List<FeedbackResponse> firstQueryResponses = load()
-                .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("giverEmail =", giverEmail)
-                .filter("giverSection =", section)
-                .list();
-
-        for (FeedbackResponse response : firstQueryResponses) {
-            feedbackResponses.put(response.getId(), response);
-        }
-
-        List<FeedbackResponse> secondQueryResponses = load()
-                .filter("feedbackQuestionId =", feedbackQuestionId)
-                .filter("giverEmail =", giverEmail)
-                .filter("receiverSection =", section)
-                .list();
-
-        for (FeedbackResponse response : secondQueryResponses) {
-            feedbackResponses.put(response.getId(), response);
-        }
-
-        return feedbackResponses.values();
-    }
-
-    private List<FeedbackResponse> getFeedbackResponseEntitiesFromGiverForSessionWithinRange(
-            String giverEmail, String feedbackSessionName, String courseId, int range) {
+    private List<FeedbackResponse> getFeedbackResponseEntitiesForReceiverForQuestion(
+            String feedbackQuestionId, String receiver) {
         return load()
-                .filter("giverEmail =", giverEmail)
-                .filter("feedbackSessionName =", feedbackSessionName)
-                .filter("courseId =", courseId)
-                .limit(range + 1).list();
+                .filter("feedbackQuestionId =", feedbackQuestionId)
+                .filter("receiver =", receiver)
+                .list();
     }
 
     private List<FeedbackResponse> getFeedbackResponseEntitiesForReceiverForCourse(
@@ -682,35 +405,19 @@ public class FeedbackResponsesDb extends EntitiesDb<FeedbackResponse, FeedbackRe
     }
 
     @Override
-    protected FeedbackResponse getEntity(FeedbackResponseAttributes attributes) {
-        if (attributes.getId() != null) {
-            return getFeedbackResponseEntity(attributes.getId());
-        }
-
-        return getFeedbackResponseEntity(attributes.feedbackQuestionId, attributes.giver, attributes.recipient);
-    }
-
-    @Override
-    protected QueryKeys<FeedbackResponse> getEntityQueryKeys(FeedbackResponseAttributes attributes) {
-        String id = attributes.getId();
-
-        Query<FeedbackResponse> query;
-        if (id == null) {
-            query = load()
-                    .filter("feedbackQuestionId =", attributes.feedbackQuestionId)
-                    .filter("giverEmail =", attributes.giver)
-                    .filter("receiver =", attributes.recipient);
-        } else {
-            query = load().filterKey(Key.create(FeedbackResponse.class, id));
-        }
-
-        return query.keys();
+    protected boolean hasExistingEntities(FeedbackResponseAttributes entityToCreate) {
+        return !load()
+                .filterKey(Key.create(FeedbackResponse.class,
+                        FeedbackResponse.generateId(entityToCreate.getFeedbackQuestionId(),
+                                entityToCreate.getGiver(), entityToCreate.getRecipient())))
+                .list()
+                .isEmpty();
     }
 
     @Override
     protected FeedbackResponseAttributes makeAttributes(FeedbackResponse entity) {
         Assumption.assertNotNull(Const.StatusCodes.DBLEVEL_NULL_INPUT, entity);
 
-        return new FeedbackResponseAttributes(entity);
+        return FeedbackResponseAttributes.valueOf(entity);
     }
 }

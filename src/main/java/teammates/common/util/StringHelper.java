@@ -1,13 +1,10 @@
 package teammates.common.util;
 
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.regex.Matcher;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -15,6 +12,7 @@ import java.util.stream.IntStream;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import com.google.common.base.CharMatcher;
@@ -41,13 +39,12 @@ public final class StringHelper {
         return s == null || s.isEmpty();
     }
 
+    /**
+     * Generates a string which consists of {@code length} copies of {@code character} without space.
+     */
     public static String generateStringOfLength(int length, char character) {
         Assumption.assertTrue(length >= 0);
         return String.join("", Collections.nCopies(length, String.valueOf(character)));
-    }
-
-    public static boolean isWhiteSpace(String string) {
-        return string.trim().isEmpty();
     }
 
     /**
@@ -62,31 +59,10 @@ public final class StringHelper {
     }
 
     /**
-     * Checks whether any substring of the input string matches any of the group of given regex expressions.
-     * @param input The string to be matched
-     * @param regexList The regex list used for the matching
+     * Generates a left-indentation of {@code length} units.
      */
-    public static boolean isAnyMatching(String input, List<String> regexList) {
-        return regexList.stream()
-                .anyMatch(r -> isMatching(input.trim().toLowerCase(), r));
-    }
-
     public static String getIndent(int length) {
         return generateStringOfLength(length, ' ');
-    }
-
-    /**
-     * Checks whether the {@code inputString} is longer than a specified length
-     * if so returns the truncated name appended by ellipsis,
-     * otherwise returns the original input. <br>
-     * E.g., "12345678" truncated to length 6 returns "123..."
-     */
-    public static String truncate(String inputString, int truncateLength) {
-        if (inputString.length() <= truncateLength) {
-            return inputString;
-        }
-
-        return inputString.substring(0, truncateLength - 3) + "...";
     }
 
     /**
@@ -104,26 +80,46 @@ public final class StringHelper {
     }
 
     /**
-     * Checks whether the {@code longId} is longer than the length specified
-     * in {@link Const.SystemParams},
-     * if so returns the truncated longId appended by ellipsis,
-     * otherwise returns the original longId.
+     * Generates the HMAC SHA-1 signature for a supplied string.
+     *
+     * @param data The string to be signed
+     * @return The signature value as a hex-string
      */
-    public static String truncateLongId(String longId) {
-        return truncate(longId, Const.SystemParams.USER_ID_MAX_DISPLAY_LENGTH);
+    public static String generateSignature(String data) {
+        try {
+            SecretKeySpec signingKey =
+                    new SecretKeySpec(hexStringToByteArray(Config.ENCRYPTION_KEY), "HmacSHA1");
+            Mac mac = Mac.getInstance("HmacSHA1");
+            mac.init(signingKey);
+            byte[] value = mac.doFinal(data.getBytes());
+            return byteArrayToHexString(value);
+        } catch (Exception e) {
+            Assumption.fail(TeammatesException.toStringWithStackTrace(e));
+            return null;
+        }
     }
 
     /**
-     * Substitutes the middle third of the given string with dots
-     * and returns the "obscured" string.
+     * Verifies the HMAC SHA-1 signature against a given value.
+     *
+     * @param value The value to be checked
+     * @param signature The signature in hex-string format
+     * @return True if signature matches value
      */
-    public static String obscure(String inputString) {
-        Assumption.assertNotNull(inputString);
-        String frontPart = inputString.substring(0, inputString.length() / 3);
-        String endPart = inputString.substring(2 * inputString.length() / 3);
-        return frontPart + ".." + endPart;
+    public static boolean isCorrectSignature(String value, String signature) {
+        if (value == null || signature == null) {
+            return false;
+        }
+        return Objects.equals(generateSignature(value), signature);
     }
 
+    /**
+     * Encrypts the supplied string.
+     *
+     * @param value the plaintext as a string
+     * @return the ciphertext
+     * @throws RuntimeException if the encryption fails for some reason, such as {@code Cipher} initialization failure.
+     */
     public static String encrypt(String value) {
         try {
             SecretKeySpec sks = new SecretKeySpec(hexStringToByteArray(Config.ENCRYPTION_KEY), "AES");
@@ -137,12 +133,12 @@ public final class StringHelper {
         }
     }
 
-    /*
+    /**
      * Decrypts the supplied string.
      *
      * @param message the ciphertext as a hexadecimal string
      * @return the plaintext
-     * @throws InvalidParameterException if the ciphertext is invalid.
+     * @throws InvalidParametersException if the ciphertext is invalid.
      * @throws RuntimeException if the decryption fails for any other reason, such as {@code Cipher} initialization failure.
      */
     public static String decrypt(String message) throws InvalidParametersException {
@@ -181,26 +177,12 @@ public final class StringHelper {
                 .collect(Collectors.joining(delimiter));
     }
 
+    /**
+     * Converts a double value between 0 and 1 to 3dp-string.
+     */
     public static String toDecimalFormatString(double doubleVal) {
         DecimalFormat df = new DecimalFormat("0.###");
         return df.format(doubleVal);
-    }
-
-    @Deprecated
-    public static String toUtcFormat(double hourOffsetTimeZone) {
-        String utcFormatTimeZone = "UTC";
-        if (hourOffsetTimeZone == 0) {
-            return utcFormatTimeZone;
-        }
-
-        if ((int) hourOffsetTimeZone == hourOffsetTimeZone) {
-            return utcFormatTimeZone + String.format(" %+03d:00", (int) hourOffsetTimeZone);
-        }
-
-        return utcFormatTimeZone + String.format(
-                                    " %+03d:%02d",
-                                    (int) hourOffsetTimeZone,
-                                    (int) (Math.abs(hourOffsetTimeZone - (int) hourOffsetTimeZone) * 300 / 5));
     }
 
     /**
@@ -231,7 +213,6 @@ public final class StringHelper {
      *
      * @return split name array{0--> first name, 1--> last name, 2--> processed full name by removing "{}"}
      */
-
     public static String[] splitName(String fullName) {
 
         if (fullName == null) {
@@ -274,20 +255,6 @@ public final class StringHelper {
     }
 
     /**
-     * Trims all strings in the set and reduces consecutive white spaces to only one space.
-     */
-    public static Set<String> removeExtraSpace(Set<String> strSet) {
-        if (strSet == null) {
-            return null;
-        }
-        Set<String> result = new TreeSet<>();
-        for (String s : strSet) {
-            result.add(removeExtraSpace(s));
-        }
-        return result;
-    }
-
-    /**
      * Replaces every character in {@code str} that does not match
      * {@code regex} with the character {@code replacement}.
      *
@@ -310,6 +277,9 @@ public final class StringHelper {
         return String.valueOf(charArray);
     }
 
+    /**
+     * Converts a byte array to hexadecimal string.
+     */
     public static String byteArrayToHexString(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
         for (byte b : bytes) {
@@ -322,127 +292,14 @@ public final class StringHelper {
         return sb.toString().toUpperCase();
     }
 
+    /**
+     * Converts a hexadecimal string to byte array.
+     */
     public static byte[] hexStringToByteArray(String s) {
         byte[] b = new byte[s.length() / 2];
         IntStream.range(0, b.length)
                 .forEach(i -> b[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16));
         return b;
-    }
-
-    /**
-     * Converts a csv string to a html table string for displaying.
-     * @return html table string
-     */
-    public static String csvToHtmlTable(String str) {
-        String[] lines = handleNewLine(str).split(System.lineSeparator());
-
-        StringBuilder result = new StringBuilder();
-
-        for (String line : lines) {
-
-            List<String> rowData = getTableData(line);
-
-            if (checkIfEmptyRow(rowData)) {
-                continue;
-            }
-
-            result.append("<tr>");
-            for (String td : rowData) {
-                result.append(String.format("<td>%s</td>", SanitizationHelper.sanitizeForHtml(td)));
-            }
-            result.append("</tr>");
-        }
-
-        return String.format("<table class=\"table table-bordered table-striped table-condensed\">%s</table>",
-                             result.toString());
-    }
-
-    private static String handleNewLine(String str) {
-
-        StringBuilder buffer = new StringBuilder();
-        char[] chars = str.toCharArray();
-
-        boolean isInQuote = false;
-
-        for (char c : chars) {
-            if (c == '"') {
-                isInQuote = !isInQuote;
-            }
-
-            if (c == '\n' && isInQuote) {
-                buffer.append("<br>");
-            } else {
-                buffer.append(c);
-            }
-        }
-
-        return buffer.toString();
-    }
-
-    private static List<String> getTableData(String str) {
-        List<String> data = new ArrayList<>();
-
-        boolean inquote = false;
-        StringBuilder buffer = new StringBuilder();
-        char[] chars = str.toCharArray();
-
-        for (int i = 0; i < chars.length; i++) {
-            if (chars[i] == '"') {
-                if (i + 1 < chars.length && chars[i + 1] == '"') {
-                    i++;
-                } else {
-                    inquote = !inquote;
-                    continue;
-                }
-            }
-
-            if (chars[i] == ',') {
-                if (inquote) {
-                    buffer.append(chars[i]);
-                } else {
-                    data.add(buffer.toString());
-                    buffer.delete(0, buffer.length());
-                }
-            } else {
-                buffer.append(chars[i]);
-            }
-
-        }
-
-        data.add(buffer.toString().trim());
-
-        return data;
-    }
-
-    private static boolean checkIfEmptyRow(List<String> rowData) {
-        return rowData.stream()
-                .allMatch(r -> r.isEmpty());
-    }
-
-    /**
-     * From: http://stackoverflow.com/questions/11969840/how-to-convert-a-base-10-number-to-alphabetic-like-ordered-list-in-html
-     * Converts an integer to alphabetical form (base26)
-     * 1 - a
-     * 2 - b
-     * ...
-     * 26 - z
-     * 27 - aa
-     * 28 - ab
-     * ...
-     *
-     * @param n - number to convert
-     */
-    public static String integerToLowerCaseAlphabeticalIndex(int n) {
-        StringBuilder result = new StringBuilder();
-        int n0 = n;
-        while (n0 > 0) {
-            n0--; // 1 => a, not 0 => a
-            int remainder = n0 % 26;
-            char digit = (char) (remainder + 97);
-            result.append(digit);
-            n0 = (n0 - remainder) / 26;
-        }
-        return result.reverse().toString();
     }
 
     /**
@@ -455,18 +312,6 @@ public final class StringHelper {
     }
 
     /**
-     * Counts the number of empty strings passed as the argument. Null is
-     * considered an empty string, while whitespace is not.
-     *
-     * @return number of empty strings passed
-     */
-    public static int countEmptyStrings(String... strings) {
-        return Math.toIntExact(Arrays.stream(strings)
-                .filter(s -> isEmpty(s))
-                .count());
-    }
-
-    /**
      * Converts null input to empty string. Non-null inputs will be left as is.
      * This method is for displaying purpose.
      *
@@ -474,71 +319,6 @@ public final class StringHelper {
      */
     public static String convertToEmptyStringIfNull(String str) {
         return str == null ? "" : str;
-    }
-
-    /**
-     * Removes the outermost enclosing square brackets surrounding a string.
-     *
-     * @return the string without the outermost enclosing square brackets
-     *         if the given string is enclosed by square brackets <br>
-     *         the string itself if the given string is not enclosed by square brackets <br>
-     *         null if the given string is null
-     */
-    public static String removeEnclosingSquareBrackets(String str) {
-        if (str == null) {
-            return null;
-        }
-
-        Pattern p = Pattern.compile("^\\[(.*)]$");
-        Matcher m = p.matcher(str);
-        return m.find() ? m.group(1) : str;
-    }
-
-    /**
-     * Returns a String array after removing white spaces leading and
-     * trailing any string in the input array.
-     */
-    public static String[] trim(String[] stringsToTrim) {
-        return Arrays.stream(stringsToTrim)
-                .map(s -> s.trim())
-                .toArray(size -> new String[size]);
-    }
-
-    /**
-     * Returns a String array after converting them to lower case.
-     */
-    public static String[] toLowerCase(String[] stringsToConvertToLowerCase) {
-        return Arrays.stream(stringsToConvertToLowerCase)
-                .map(s -> s.toLowerCase())
-                .toArray(size -> new String[size]);
-    }
-
-    /**
-     * Returns text with all non-ASCII characters removed.
-     */
-    public static String removeNonAscii(String text) {
-        return text.replaceAll("[^\\x00-\\x7F]", "");
-    }
-
-    /**
-     * Returns a new String composed of copies of the String elements joined together
-     * with a copy of the specified delimiter.
-     */
-    public static String join(String delimiter, List<Integer> elements) {
-        return String.join(delimiter, toStringArray(elements));
-    }
-
-    /**
-     * Converts list of integer to array of strings.
-     */
-    private static String[] toStringArray(List<Integer> elements) {
-        if (elements == null) {
-            throw new IllegalArgumentException("Provided arguments cannot be null");
-        }
-
-        return elements.stream()
-                .map(s -> String.valueOf(s))
-                .toArray(size -> new String[size]);
     }
 
     /**

@@ -19,11 +19,6 @@ import teammates.test.driver.TestProperties;
 public class BaseTestCase {
 
     /**
-     * Dummy session token for use in tests that depend on, but don't use, it (e.g. page data tests).
-     */
-    protected static final String dummySessionToken = null;
-
-    /**
      * Test Segment divider. Used to divide a test case into logical sections.
      * The weird name is for easy spotting.
      *
@@ -52,17 +47,20 @@ public class BaseTestCase {
         System.out.println(message);
     }
 
+    protected String getTestDataFolder() {
+        return TestProperties.TEST_DATA_FOLDER;
+    }
+
     /**
      * Creates a DataBundle as specified in typicalDataBundle.json.
      */
-    protected static DataBundle getTypicalDataBundle() {
+    protected DataBundle getTypicalDataBundle() {
         return loadDataBundle("/typicalDataBundle.json");
     }
 
-    protected static DataBundle loadDataBundle(String pathToJsonFileParam) {
+    protected DataBundle loadDataBundle(String jsonFileName) {
         try {
-            String pathToJsonFile = (pathToJsonFileParam.charAt(0) == '/' ? TestProperties.TEST_DATA_FOLDER : "")
-                                  + pathToJsonFileParam;
+            String pathToJsonFile = getTestDataFolder() + jsonFileName;
             String jsonString = FileHelper.readFile(pathToJsonFile);
             return JsonUtils.fromJson(jsonString, DataBundle.class);
         } catch (IOException e) {
@@ -181,10 +179,6 @@ public class BaseTestCase {
         Assert.fail(message);
     }
 
-    protected static void assertArrayEquals(Object[] expecteds, Object[] actuals) {
-        Assert.assertArrayEquals(expecteds, actuals);
-    }
-
     // This method is adapted from JUnit 5's assertThrows.
     // Once we upgrade to JUnit 5, their built-in method shall be used instead.
     @SuppressWarnings({
@@ -228,7 +222,9 @@ public class BaseTestCase {
         /**
          * Executes a block of code, potentially throwing a {@link Throwable}.
          */
+        // CHECKSTYLE.OFF:IllegalThrows
         void execute() throws Throwable;
+        // CHECKSTYLE.ON:IllegalThrows
 
     }
 

@@ -1,0 +1,122 @@
+{
+  "accounts": {
+    "SCDetailsE2eT.instr": {
+      "googleId": "SCDetailsE2eT.instr",
+      "name": "Instructor",
+      "isInstructor": true,
+      "email": "tmms.test@gmail.tmt",
+      "institute": "TEAMMATES Test Institute 1"
+    }
+  },
+  "courses": {
+    "SCDetailsE2eT.CS2104": {
+      "id": "SCDetailsE2eT.CS2104",
+      "name": "Programming Language Concepts",
+      "timeZone": "UTC",
+      "createdAt": "2012-04-02T11:00:00Z"
+    }
+  },
+  "instructors": {
+    "SCDetailsE2eT.instr": {
+      "googleId": "SCDetailsE2eT.instr",
+      "courseId": "SCDetailsE2eT.CS2104",
+      "name": "Teammates Test",
+      "email": "SCDetailsE2eT.instr@gmail.tmt",
+      "role": "Co-owner",
+      "isDisplayedToStudents": true,
+      "displayedName": "Instructor",
+      "privileges": {
+        "courseLevel": {
+          "canviewstudentinsection": true,
+          "cansubmitsessioninsection": true,
+          "canmodifysessioncommentinsection": true,
+          "canmodifycourse": true,
+          "canviewsessioninsection": true,
+          "canmodifysession": true,
+          "canmodifystudent": true,
+          "canmodifyinstructor": true
+        },
+        "sectionLevel": {},
+        "sessionLevel": {}
+      }
+    },
+    "SCDetailsE2eT.instr2": {
+      "googleId": "SCDetailsE2eT.instr2",
+      "courseId": "SCDetailsE2eT.CS2104",
+      "name": "Teammates Test 2",
+      "email": "SCDetailsE2eT2.instr@gmail.tmt",
+      "role": "Co-owner",
+      "isDisplayedToStudents": true,
+      "displayedName": "Instructor",
+      "privileges": {
+        "courseLevel": {
+          "canviewstudentinsection": true,
+          "cansubmitsessioninsection": true,
+          "canmodifysessioncommentinsection": true,
+          "canmodifycourse": true,
+          "canviewsessioninsection": true,
+          "canmodifysession": true,
+          "canmodifystudent": true,
+          "canmodifyinstructor": true
+        },
+        "sectionLevel": {},
+        "sessionLevel": {}
+      }
+    }
+  },
+  "students": {
+    "SCDetailsE2eT.alice": {
+      "googleId": "SCDetailsE2eT.alice",
+      "email": "SCDetailsE2eT.alice@gmail.tmt",
+      "course": "SCDetailsE2eT.CS2104",
+      "name": "Alice Betsy",
+      "comments": "This student's name is Alice Betsy",
+      "team": "Team 1",
+      "section": "None"
+    },
+    "SCDetailsE2eT.benny": {
+      "googleId": "SCDetailsE2eT.benny",
+      "email": "SCDetailsE2eT.benny@gmail.tmt",
+      "course": "SCDetailsE2eT.CS2104",
+      "name": "Benny Charles",
+      "comments": "This student's name is Benny Charles",
+      "team": "Team 1",
+      "section": "None"
+    },
+    "SCDetailsE2eT.charlie": {
+      "googleId": "SCDetailsE2eT.charlie",
+      "email": "SCDetailsE2eT.charlie@gmail.tmt",
+      "course": "SCDetailsE2eT.CS2104",
+      "name": "Charlie Davis",
+      "comments": "This student's name is Charlie Davis",
+      "team": "Team 1",
+      "section": "None"
+    }
+  },
+  "feedbackSessions": {},
+  "feedbackQuestions": {},
+  "feedbackResponses": {},
+  "feedbackResponseComments": {},
+  "profiles": {
+    "SCDetailsE2eT.benny": {
+      "googleId": "SCDetailsE2eT.benny",
+      "shortName": "Benny",
+      "email": "SCDetailsE2eT.benny@gmail.tmt",
+      "institute": "inst",
+      "nationality": "American",
+      "gender": "OTHER",
+      "moreInfo": "I am just a student :P",
+      "pictureKey": ""
+    },
+    "SCDetailsE2eT.charlie": {
+      "googleId": "SCDetailsE2eT.charlie",
+      "shortName": "Charlie",
+      "email": "SCDetailsE2eT.charlie@gmail.tmt",
+      "institute": "inst",
+      "nationality": "Singaporean",
+      "gender": "OTHER",
+      "moreInfo": "I am also a student :P",
+      "pictureKey": ""
+    }
+  }
+}

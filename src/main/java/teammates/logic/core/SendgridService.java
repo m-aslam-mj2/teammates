@@ -4,18 +4,18 @@ import java.io.IOException;
 
 import org.jsoup.Jsoup;
 
-import com.sendgrid.Content;
-import com.sendgrid.Email;
-import com.sendgrid.Mail;
 import com.sendgrid.Method;
-import com.sendgrid.Personalization;
 import com.sendgrid.Request;
 import com.sendgrid.Response;
 import com.sendgrid.SendGrid;
+import com.sendgrid.helpers.mail.Mail;
+import com.sendgrid.helpers.mail.objects.Content;
+import com.sendgrid.helpers.mail.objects.Email;
+import com.sendgrid.helpers.mail.objects.Personalization;
 
 import teammates.common.util.Config;
+import teammates.common.util.EmailSendingStatus;
 import teammates.common.util.EmailWrapper;
-import teammates.common.util.Logger;
 
 /**
  * Email sender service provided by SendGrid.
@@ -24,8 +24,6 @@ import teammates.common.util.Logger;
  * @see SendGrid
  */
 public class SendgridService extends EmailSenderService {
-
-    private static final Logger log = Logger.getLogger();
 
     /**
      * {@inheritDoc}
@@ -54,7 +52,7 @@ public class SendgridService extends EmailSenderService {
     }
 
     @Override
-    protected void sendEmailWithService(EmailWrapper wrapper) throws IOException {
+    public EmailSendingStatus sendEmail(EmailWrapper wrapper) throws IOException {
         Mail email = parseToEmail(wrapper);
         SendGrid sendgrid = new SendGrid(Config.SENDGRID_APIKEY);
         Request request = new Request();
@@ -62,9 +60,7 @@ public class SendgridService extends EmailSenderService {
         request.setEndpoint("mail/send");
         request.setBody(email.build());
         Response response = sendgrid.api(request);
-        if (isNotSuccessStatus(response.getStatusCode())) {
-            log.severe("Email failed to send: " + response.getBody());
-        }
+        return new EmailSendingStatus(response.getStatusCode(), response.getBody());
     }
 
 }

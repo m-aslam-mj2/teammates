@@ -1,7 +1,6 @@
 package teammates.common.datatransfer;
 
 import java.util.Arrays;
-import java.util.List;
 
 import teammates.common.util.Assumption;
 import teammates.common.util.Const;
@@ -33,11 +32,6 @@ public class TeamEvalResult {
 
     /** the values that were used to calculate normalizedAveragePerceived values. */
     public int[][] normalizedPeerContributionRatio;
-
-    // List of student email's.
-    // The index of the student in the list is used as the index for the int arrays.
-    // The 2d int arrays are of the format [giverIndex][recipientIndex]
-    public List<String> studentEmails;
 
     public TeamEvalResult(int[][] submissionValues) {
         /*This is the only method that should be public. However, many of the
@@ -273,10 +267,6 @@ public class TeamEvalResult {
         return multiplyByFactor(factor, input);
     }
 
-    public static double[] normalizeValues(int[] input) {
-        return normalizeValues(intToDouble(input));
-    }
-
     public static int[][] normalizeValues(int[][] input) {
         return doubleToInt(normalizeValues(intToDouble(input)));
     }
@@ -299,37 +289,20 @@ public class TeamEvalResult {
         return factor;
     }
 
-    @SuppressWarnings("PMD.AvoidArrayLoops") // the arrays are of different types
     private static double[] intToDouble(int[] input) {
-        double[] converted = new double[input.length];
-        for (int i = 0; i < input.length; i++) {
-            converted[i] = input[i];
-        }
-        return converted;
+        return Arrays.stream(input).mapToDouble(value -> value).toArray();
     }
 
     private static double[][] intToDouble(int[][] input) {
-        double[][] converted = new double[input.length][input[0].length];
-        for (int i = 0; i < input.length; i++) {
-            converted[i] = intToDouble(input[i]);
-        }
-        return converted;
+        return Arrays.stream(input).map(value -> intToDouble(value)).toArray(double[][]::new);
     }
 
     private static int[] doubleToInt(double[] input) {
-        int[] converted = new int[input.length];
-        for (int i = 0; i < input.length; i++) {
-            converted[i] = (int) Math.round(input[i]);
-        }
-        return converted;
+        return Arrays.stream(input).mapToInt(value -> (int) Math.round(value)).toArray();
     }
 
     private static int[][] doubleToInt(double[][] input) {
-        int[][] output = new int[input.length][input.length];
-        for (int i = 0; i < input.length; i++) {
-            output[i] = doubleToInt(input[i]);
-        }
-        return output;
+        return Arrays.stream(input).map(value -> doubleToInt(value)).toArray(int[][]::new);
     }
 
     // TODO: make this private and use reflection to test
@@ -397,7 +370,8 @@ public class TeamEvalResult {
         return replaceMagicNumbers(returnValue.toString());
     }
 
-    /** replaces 999 etc. with NA, NSB, NSU etc.
+    /**
+     * Replaces 999 etc. with NA, NSB, NSU etc.
      */
     public static String replaceMagicNumbers(String returnValue) {
         return returnValue.replace(NA + ".0", " NA")
@@ -418,30 +392,30 @@ public class TeamEvalResult {
         sb.append("           claimed from student:");
         String filler = "                                ";
         sb.append(indentString)
-          .append(pointsToString(claimed).replace(System.lineSeparator(),
+                .append(pointsToString(claimed).replace(System.lineSeparator(),
                         System.lineSeparator() + indentString + filler))
-          .append(divider)
-          .append("              normalizedClaimed:")
-          .append(indentString)
-          .append(pointsToString(normalizedClaimed).replace(System.lineSeparator(),
+                .append(divider)
+                .append("              normalizedClaimed:")
+                .append(indentString)
+                .append(pointsToString(normalizedClaimed).replace(System.lineSeparator(),
                         System.lineSeparator() + indentString + filler))
-          .append(divider)
-          .append("normalizedPeerContributionRatio:")
-          .append(indentString)
-          .append(pointsToString(normalizedPeerContributionRatio).replace(
+                .append(divider)
+                .append("normalizedPeerContributionRatio:")
+                .append(indentString)
+                .append(pointsToString(normalizedPeerContributionRatio).replace(
                         System.lineSeparator(), System.lineSeparator() + indentString + filler))
-          .append(divider)
-          .append("     normalizedAveragePerceived:")
-          .append(indentString)
-          .append(pointsToString(normalizedAveragePerceived).replace(
+                .append(divider)
+                .append("     normalizedAveragePerceived:")
+                .append(indentString)
+                .append(pointsToString(normalizedAveragePerceived).replace(
                         System.lineSeparator(), System.lineSeparator() + indentString + filler))
-          .append(divider)
+                .append(divider)
 
-          .append("   denormalizedAveragePerceived:")
-          .append(indentString)
-          .append(pointsToString(denormalizedAveragePerceived).replace(
+                .append("   denormalizedAveragePerceived:")
+                .append(indentString)
+                .append(pointsToString(denormalizedAveragePerceived).replace(
                         System.lineSeparator(), System.lineSeparator() + indentString + filler))
-            .append(divider);
+                .append(divider);
         return sb.toString();
     }
 

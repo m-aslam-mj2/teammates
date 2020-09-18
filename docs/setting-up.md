@@ -10,42 +10,10 @@ All the instructions in this document work for Linux, OS X, and Windows, with th
 
 > If you encounter any problems during the setup process, please refer to our [troubleshooting guide](troubleshooting-guide.md) before posting a help request in our [issue tracker](https://github.com/TEAMMATES/teammates/issues).
 
-## Step 1: Install necessary tools and languages
+## Step 1: Obtain your own copy of the repository
 
 1. Install Git.
    1. (Optional but recommended) Install Sourcetree or other similar Git client.
-1. Install JDK 1.8.
-1. Install Python 2.7.
-1. Install Node.js (minimum version 6.11.5).
-1. Install Google Cloud SDK (minimum version 222.0.0). Follow the directions given [here](https://cloud.google.com/sdk/downloads).
-   Note that you *do not* need to [initialize the SDK](https://cloud.google.com/sdk/docs/initializing).
-   ```sh
-   # Run the following command at the Google Cloud SDK directory
-
-   # Linux/OS X
-   ./install.sh --path-update true
-
-   # Windows
-   install.bat --path-update true
-   ```
-   If you are installing in Red Hat, CentOS, Fedora, Debian or Ubuntu, refer to the quick start of Google Cloud SDK for [Debian/Ubuntu](https://cloud.google.com/sdk/docs/quickstart-debian-ubuntu) or [Red Hat/CentOS/Fedora](https://cloud.google.com/sdk/docs/quickstart-redhat-centos) respectively.
-
-   **Verification**: Run a `gcloud` command (e.g. `gcloud version`) in order to verify that you can access the SDK from the command line.
-
-1. Run the following command to install App Engine Java SDK bundled with the Cloud SDK:
-   ```sh
-   # Linux/OS X/Windows
-   gcloud -q components install app-engine-java
-   
-   # Red Hat/CentOS/Fedora
-   sudo yum install google-cloud-sdk-app-engine-java
-   
-   # Debian/Ubuntu
-   sudo apt-get install google-cloud-sdk-app-engine-java
-   ```
-   **Verification:** Run `gcloud version` and there should be an entry on `app-engine-java`.
-
-## Step 2: Obtain your own copy of the repository
 
 1. Fork our repo at https://github.com/TEAMMATES/teammates. Clone the fork to your hard disk.
 
@@ -68,13 +36,23 @@ All the instructions in this document work for Linux, OS X, and Windows, with th
 
 More information can be found at [this documentation](https://help.github.com/articles/fork-a-repo/).
 
-## Step 3: Set up project-specific settings and dependencies
+## Step 2: Install necessary tools and languages
 
-1. Run this command to download the necessary tools for JavaScript development:
+These tools are necessary regardless of whether you are developing front-end or back-end:
+
+1. Install JDK 1.8.
+1. Install Python 3 (recommended) or Python 2.7.
+
+If you want to develop front-end, you need to install the following:
+
+1. Install Node.js (minimum version 12.11.1).
+1. (Optional but highly recommended) Install Angular CLI version 9 globally.
    ```sh
-   npm install
+   npm install -g @angular/cli@9
    ```
-   **Verification:** A folder named `node_modules` should be added to the project root directory.
+   **Verification:** Run `ng` and you should see a list of available Angular CLI commands.
+
+## Step 3: Set up project-specific settings and dependencies
 
 1. Run this command to create the main config files (these are not under revision control because their contents vary from developer to developer):
    ```sh
@@ -83,19 +61,20 @@ More information can be found at [this documentation](https://help.github.com/ar
    **Verification:** The file named `gradle.properties` should be added to the project root directory.
 
 1. Modify the following config file:
-   * `gradle.properties`<br>
-      If you want to use a JDK other than the one specified in your PATH variable, add the value to the variable `org.gradle.java.home`.
+   * `gradle.properties`
+     * If you want to use a JDK other than the one specified in your PATH variable, add the value to the variable `org.gradle.java.home`.
+     * If you want to use a specific Google Cloud SDK installation, add the value to the variable `cloud.sdk.home`. A minimum version of `274.0.0` is required.
 
-## Step 4: Set up an IDE (Recommended)
+1. Run this command to download the necessary tools for front-end development (if you are going to be involved):
+   ```sh
+   npm ci
+   ```
+   **Verification:** A folder named `node_modules` should be added to the project root directory.
 
-You are encouraged, but not required, to use an IDE to assist development tasks.
+**Q:** Can I set up the project in IDEs, e.g. Eclipse, IntelliJ?<br>
+**A:** You are welcome to; the core team have been using IntelliJ to a varying degree of success, but IDE-based development (even with IntelliJ) is not actively supported/maintained by the team.
 
-We currently support two IDEs: Eclipse IDE and IntelliJ IDEA.
-Support requests related to other IDEs will not be entertained.
-
-Refer to [this document](ide-setup.md) if you wish to set up an IDE for developing TEAMMATES.
-
-## Step 5: Start developing
+## Step 4: Start developing
 
 If you have followed every step correctly, your development environment should be set up successfully.
 

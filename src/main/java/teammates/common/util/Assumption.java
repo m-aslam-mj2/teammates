@@ -1,7 +1,5 @@
 package teammates.common.util;
 
-import teammates.common.exception.NullPostParameterException;
-
 /**
  * This class provides a set of static method to verify assumptions about the system.
  * When the real runtime condition differs from the assumed situation,
@@ -61,19 +59,6 @@ public final class Assumption {
     }
 
     /**
-     * <em>Fails</em> a test <em>without</em> a failure message.
-     *
-     * <p>Although failing <em>with</em> an explicit failure message is recommended,
-     * this method may be useful when maintaining legacy code.
-     *
-     * @deprecated Use the version that makes failure message compulsory
-     */
-    @Deprecated
-    public static void fail() {
-        throw new AssertionError();
-    }
-
-    /**
      * <em>Asserts</em> that {@code expected} and {@code actual} are equal.
      *
      * <p>If both are {@code null}, they are considered equal.
@@ -121,13 +106,6 @@ public final class Assumption {
             if (object == null) {
                 fail(message);
             }
-        }
-    }
-
-    public static <T> void assertPostParamNotNull(String parameterName, T postParameter) {
-        if (postParameter == null) {
-            throw new NullPostParameterException(String.format(Const.StatusCodes.NULL_POST_PARAMETER,
-                    parameterName));
         }
     }
 

@@ -1,0 +1,43 @@
+<div class="modal-header text-white"
+     [ngClass]="{'bg-danger': hasFailToSaveQuestions, 'bg-success': !hasFailToSaveQuestions}">
+  <h5 class="modal-title">
+        <span *ngIf="!hasFailToSaveQuestions">
+          <i class="fas fa-check-circle"></i> All responses submitted successfully!
+        </span>
+    <span *ngIf="hasFailToSaveQuestions">
+          <i class="fas fa-exclamation-circle"></i> Some questions were not saved!
+        </span>
+  </h5>
+  <button type="button" class="close" (click)="activeModal.dismiss()">
+    <i class="fas fa-times"></i>
+  </button>
+</div>
+<div class="modal-body">
+  <p id="not-answered-questions" *ngIf="notYetAnsweredQuestions.length !== 0">
+    <i class="fas fa-exclamation"></i> Note that some questions are yet to be answered.
+    They are: {{ notYetAnsweredQuestions }}.
+  </p>
+  <div *ngIf="hasFailToSaveQuestions" class="text-danger">
+    <i class="fas fa-exclamation"></i> Some answers to questions are not saved due to errors.
+    <ul>
+      <li *ngFor="let question of failToSaveQuestions | keyvalue">
+        Question {{ question.key }}:  {{ question.value }}
+      </li>
+    </ul>
+  </div>
+  <p *ngIf="!hasFailToSaveQuestions">
+    All your responses have been successfully recorded! You may now leave this page.
+  </p>
+  <p>
+    Note that you can change your responses and submit them again any time before the session closes.
+  </p>
+  <div class="alert alert-danger" role="alert" *ngIf="hasSubmissionConfirmationError">
+    Your responses might be saved but we cannot confirm your submission. Please try again.
+  </div>
+</div>
+<div class="modal-footer">
+  <button type="button" class="btn modal-btn-ok"
+          [ngClass]="
+                {'btn-danger': hasFailToSaveQuestions, 'btn-success': !hasFailToSaveQuestions}"
+          (click)="activeModal.close()">OK</button>
+</div>

@@ -11,7 +11,7 @@ import teammates.test.pageobjects.InstructorHelpPage;
 /**
  * SUT: {@link InstructorHelpPage}.
  */
-public class InstructorHelpPageUiTest extends BaseUiTestCase {
+public class InstructorHelpPageUiTest extends BaseLegacyUiTestCase {
     private static final By SEARCH_RESULTS = By.id("searchResults");
     private InstructorHelpPage helpPage;
 
@@ -22,7 +22,7 @@ public class InstructorHelpPageUiTest extends BaseUiTestCase {
 
     @BeforeClass
     public void classSetup() {
-        helpPage = AppPage.getNewPageInstance(browser, createUrl(Const.ActionURIs.INSTRUCTOR_HELP_PAGE + ".jsp"),
+        helpPage = AppPage.getNewPageInstance(browser, createUrl(Const.WebPageURIs.INSTRUCTOR_HELP_PAGE + ".jsp"),
                                                 InstructorHelpPage.class);
     }
 

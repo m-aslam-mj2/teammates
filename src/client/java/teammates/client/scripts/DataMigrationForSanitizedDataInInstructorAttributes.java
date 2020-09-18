@@ -1,28 +1,33 @@
 package teammates.client.scripts;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
-import teammates.common.datatransfer.attributes.InstructorAttributes;
-import teammates.common.exception.EntityDoesNotExistException;
-import teammates.common.exception.InvalidParametersException;
+import com.googlecode.objectify.cmd.Query;
+
 import teammates.common.util.SanitizationHelper;
-import teammates.storage.api.InstructorsDb;
 import teammates.storage.entity.Instructor;
 
 /**
- * Script to desanitize content of {@link InstructorAttributes} if it is sanitized.
+ * Script to desanitize content of {@link Instructor} if it is sanitized.
  */
+public class DataMigrationForSanitizedDataInInstructorAttributes
+        extends DataMigrationEntitiesBaseScript<Instructor> {
 
-public class DataMigrationForSanitizedDataInInstructorAttributes extends DataMigrationForEntities<InstructorAttributes> {
-
-    private InstructorsDb instructorsDb = new InstructorsDb();
+    public DataMigrationForSanitizedDataInInstructorAttributes() {
+        numberOfScannedKey.set(0L);
+        numberOfAffectedEntities.set(0L);
+        numberOfUpdatedEntities.set(0L);
+    }
 
     public static void main(String[] args) throws IOException {
         DataMigrationForSanitizedDataInInstructorAttributes migrator =
-                     new DataMigrationForSanitizedDataInInstructorAttributes();
+                new DataMigrationForSanitizedDataInInstructorAttributes();
         migrator.doOperationRemotely();
+    }
+
+    @Override
+    protected Query<Instructor> getFilterQuery() {
+        return ofy().load().type(Instructor.class);
     }
 
     @Override
@@ -31,69 +36,19 @@ public class DataMigrationForSanitizedDataInInstructorAttributes extends DataMig
     }
 
     @Override
-    protected List<InstructorAttributes> getEntities() {
-        return getAllCourseInstructors();
-
-    }
-
-    @Override
-    protected boolean isMigrationNeeded(InstructorAttributes instructor) {
-        return SanitizationHelper.isSanitizedHtml(instructor.displayedName)
-                || SanitizationHelper.isSanitizedHtml(instructor.role);
-    }
-
-    @Override
-    protected void printPreviewInformation(InstructorAttributes instructor) {
-        println("Checking instructor having email: " + instructor.email);
-
-        if (SanitizationHelper.isSanitizedHtml(instructor.displayedName)) {
-            println("displayName: " + instructor.displayedName);
-            println("new displayName: " + fixSanitization(instructor.displayedName));
+    protected boolean isMigrationNeeded(Instructor instructor) throws Exception {
+        if (SanitizationHelper.isSanitizedHtml(instructor.getRole())) {
+            logError(String.format("Instructor %s has unsanitized role %s, this should not happen",
+                    instructor.getUniqueId(), instructor.getRole()));
         }
-        if (SanitizationHelper.isSanitizedHtml(instructor.role)) {
-            println("role: " + instructor.role);
-            println("new role: " + fixSanitization(instructor.role));
-        }
-        println("");
+
+        return SanitizationHelper.isSanitizedHtml(instructor.getDisplayedName());
     }
 
     @Override
-    protected void migrate(InstructorAttributes instructor) throws InvalidParametersException, EntityDoesNotExistException {
-        fixSanitizationForInstructor(instructor);
-        updateInstructor(instructor);
-    }
+    protected void migrateEntity(Instructor instructor) throws Exception {
+        instructor.setDisplayedName(SanitizationHelper.desanitizeIfHtmlSanitized(instructor.getDisplayedName()));
 
-    @Override
-    protected void postAction() {
-        // nothing to do
-    }
-
-    private String fixSanitization(String s) {
-        return SanitizationHelper.desanitizeIfHtmlSanitized(s);
-    }
-
-    private void fixSanitizationForInstructor(InstructorAttributes instructor) {
-        instructor.displayedName = fixSanitization(instructor.displayedName);
-        instructor.role = fixSanitization(instructor.role);
-    }
-
-    private void updateInstructor(InstructorAttributes instructor)
-                throws InvalidParametersException, EntityDoesNotExistException {
-
-        instructorsDb.updateInstructorByEmail(instructor);
-    }
-
-    private List<InstructorAttributes> getAllCourseInstructors() {
-        ArrayList<InstructorAttributes> result = new ArrayList<>();
-
-        for (Instructor instructor : getCourseInstructorEntities()) {
-            result.add(InstructorAttributes.valueOf(instructor));
-
-        }
-        return result;
-    }
-
-    private List<Instructor> getCourseInstructorEntities() {
-        return ofy().load().type(Instructor.class).list();
+        saveEntityDeferred(instructor);
     }
 }

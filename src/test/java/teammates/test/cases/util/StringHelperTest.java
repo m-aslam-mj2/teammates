@@ -1,18 +1,16 @@
 package teammates.test.cases.util;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import javax.crypto.Cipher;
+import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.testng.annotations.Test;
 
 import teammates.common.exception.InvalidParametersException;
 import teammates.common.util.Config;
-import teammates.common.util.FieldValidator;
 import teammates.common.util.StringHelper;
 import teammates.test.cases.BaseTestCase;
 
@@ -37,21 +35,6 @@ public class StringHelperTest extends BaseTestCase {
     }
 
     @Test
-    public void testIsWhiteSpace() {
-
-        assertTrue(StringHelper.isWhiteSpace(""));
-        assertTrue(StringHelper.isWhiteSpace("       "));
-        assertTrue(StringHelper.isWhiteSpace("\t\n\t"));
-        assertTrue(StringHelper.isWhiteSpace(System.lineSeparator()));
-        assertTrue(StringHelper.isWhiteSpace(System.lineSeparator() + "   "));
-    }
-
-    @Test
-    public void testIsWhiteSpaceNull() {
-        assertThrows(NullPointerException.class, () -> StringHelper.isWhiteSpace(null));
-    }
-
-    @Test
     public void testIsMatching() {
         assertTrue(StringHelper.isMatching("\u00E0", "à"));
         assertTrue(StringHelper.isMatching("\u0061\u0300", "à"));
@@ -59,74 +42,8 @@ public class StringHelperTest extends BaseTestCase {
     }
 
     @Test
-    public void testIsAnyMatching() {
-        //this method is used in header row processing in StudentAttributesFactory: locateColumnIndexes
-        //so use this to test the various header field regex expressions here
-
-        List<String> regexList = FieldValidator.REGEX_COLUMN_NAME;
-        String[] stringsToMatch = {
-                "names", "name", " name ", " names ", "student name", "students names",
-                "student names", "students name", "full name", "full names", "full   names",
-                "student full names", "students full    names", "Names", "NAMES", "Full Names",
-                "FULL NAMES", "Full Name", "Student Full Name", "Name"
-        };
-        verifyRegexMatch(stringsToMatch, regexList, true);
-
-        stringsToMatch = new String[] {"namess", "nam", "student", "full"};
-        verifyRegexMatch(stringsToMatch, regexList, false);
-
-        regexList = FieldValidator.REGEX_COLUMN_SECTION;
-        stringsToMatch = new String[] {
-                "section", "sections", "sect", "sec", "course sections", "courses sections",
-                "course section", "course sections", "course sec", "courses sec", "Section",
-                "SECTIONS", "Sect", "Sec", "Course Section", "Course Sections"
-        };
-        verifyRegexMatch(stringsToMatch, regexList, true);
-
-        stringsToMatch = new String[] {"secc", "Section 1", "Course 1"};
-        verifyRegexMatch(stringsToMatch, regexList, false);
-
-        regexList = FieldValidator.REGEX_COLUMN_TEAM;
-        stringsToMatch = new String[] {
-                "team", "teams", "Team", "TEAMS", "group", "Group",
-                "Groups", "GROUPS", "student teams", "students teams ", "student team",
-                "students team", "STUDENT TEAM", "Student Teams ", "Student groups",
-                "Student Groups", "student   groups", "student   teams", "Course Teams",
-                "courses teams", "course   team", "courses team", "COURSE TEAM"
-        };
-        verifyRegexMatch(stringsToMatch, regexList, true);
-
-        stringsToMatch = new String[] {"tea", "Team 1", "Group 1"};
-        verifyRegexMatch(stringsToMatch, regexList, false);
-
-        regexList = FieldValidator.REGEX_COLUMN_EMAIL;
-        stringsToMatch = new String[] {
-                "email", "emails", " email ", " Email ", " Emails", "EMAILS", "EMAIL",
-                "mail", "Mail", "MAIL", "MAILS", "E-mail", "E-MAILS", "E-mail", "E-mails",
-                "e mails", "E mails", "E  mail", "E MAIL", "E MAILS", "Email address",
-                "email addresses", "EMAIL addresses", "email   addresses", "E-mail addresses",
-                "E-mail  addresses", "Contact", "CONTACT", "contacts"
-        };
-        verifyRegexMatch(stringsToMatch, regexList, true);
-
-        stringsToMatch = new String[] {"emai", "test@gmail.com", "address1"};
-        verifyRegexMatch(stringsToMatch, regexList, false);
-
-        regexList = FieldValidator.REGEX_COLUMN_COMMENT;
-        stringsToMatch = new String[] {
-                "comment", "Comment", "COMMENT", "comments", "Comments", " COMMENTS ",
-                "note", "Note", "NOTE", "notes", "Notes", "  NOTES  "
-        };
-        verifyRegexMatch(stringsToMatch, regexList, true);
-
-        stringsToMatch = new String[] {"this is a comment", "this is a note", "one comment, one note"};
-        verifyRegexMatch(stringsToMatch, regexList, false);
-
-    }
-
-    @Test
     public void testToString() {
-        ArrayList<String> strings = new ArrayList<>();
+        List<String> strings = new ArrayList<>();
         assertEquals("", StringHelper.toString(strings, ""));
         assertEquals("", StringHelper.toString(strings, "<br>"));
 
@@ -140,7 +57,7 @@ public class StringHelperTest extends BaseTestCase {
         assertEquals("aaa\nbbb", StringHelper.toString(strings, "\n"));
         assertEquals("aaa<br>bbb", StringHelper.toString(strings, "<br>"));
 
-        ArrayList<Integer> ints = new ArrayList<>();
+        List<Integer> ints = new ArrayList<>();
         ints.add(1);
         ints.add(44);
         assertEquals("1\n44", StringHelper.toString(ints, "\n"));
@@ -194,6 +111,15 @@ public class StringHelperTest extends BaseTestCase {
         cipher.init(Cipher.ENCRYPT_MODE, sks, cipher.getParameters());
         byte[] encrypted = cipher.doFinal(plaintext.getBytes());
         return StringHelper.byteArrayToHexString(encrypted);
+    }
+
+    private static String generateSignature(String data) throws Exception {
+        SecretKeySpec signingKey =
+                new SecretKeySpec(StringHelper.hexStringToByteArray(Config.ENCRYPTION_KEY), "HmacSHA1");
+        Mac mac = Mac.getInstance("HmacSHA1");
+        mac.init(signingKey);
+        byte[] value = mac.doFinal(data.getBytes());
+        return StringHelper.byteArrayToHexString(value);
     }
 
     @Test
@@ -297,19 +223,6 @@ public class StringHelperTest extends BaseTestCase {
     }
 
     @Test
-    public void testCountEmptyStrings() {
-        String empty = "";
-        String whitespace = " ";
-        String nul = null;
-        String nonEmpty = "non-empty";
-        assertEquals(1, StringHelper.countEmptyStrings(empty));
-        assertEquals(0, StringHelper.countEmptyStrings(whitespace));
-        assertEquals(1, StringHelper.countEmptyStrings(nul));
-        assertEquals(0, StringHelper.countEmptyStrings(nonEmpty));
-        assertEquals(2, StringHelper.countEmptyStrings(empty, whitespace, nul, nonEmpty));
-    }
-
-    @Test
     public void testConvertToEmptyStringIfNull() {
         String empty = "";
         String whitespace = " ";
@@ -321,139 +234,11 @@ public class StringHelperTest extends BaseTestCase {
     }
 
     @Test
-    public void testTruncate() {
-        assertEquals("1234567...", StringHelper.truncate("1234567890xxxx", 10));
-        assertEquals("1234567890", StringHelper.truncate("1234567890", 10));
-        assertEquals("123456789", StringHelper.truncate("123456789", 10));
-    }
-
-    @Test
     public void testTruncateHead() {
         assertEquals("1234567890", StringHelper.truncateHead("xxxx1234567890", 10));
         assertEquals("1234567890", StringHelper.truncateHead("1234567890", 10));
         assertEquals("123456789", StringHelper.truncateHead("123456789", 10));
         assertEquals("567890", StringHelper.truncateHead("1234567890", 6));
-    }
-
-    @Test
-    public void testRemoveEnclosingSquareBrackets() {
-        // typical case
-        assertEquals("test1, test2", StringHelper.removeEnclosingSquareBrackets("[test1, test2]"));
-
-        // input multiple square brackets, expected outermost brackets removed
-        assertEquals("[ \"test\" ]", StringHelper.removeEnclosingSquareBrackets("[[ \"test\" ]]"));
-
-        // input nested square brackets, expected outermost brackets removed
-        assertEquals("test1, [], ] test2",
-                     StringHelper.removeEnclosingSquareBrackets("[test1, [], ] test2]"));
-
-        // input no square brackets, expected same input string
-        assertEquals("test", StringHelper.removeEnclosingSquareBrackets("test"));
-        assertEquals("  test  ", StringHelper.removeEnclosingSquareBrackets("  test  "));
-
-        // input unmatched brackets, expected same input string
-        assertEquals("[test", StringHelper.removeEnclosingSquareBrackets("[test"));
-        assertEquals("(test]", StringHelper.removeEnclosingSquareBrackets("(test]"));
-
-        // input empty string, expected empty string
-        assertEquals("", StringHelper.removeEnclosingSquareBrackets(""));
-
-        // input null, expected null
-        assertNull(StringHelper.removeEnclosingSquareBrackets(null));
-    }
-
-    private void verifyRegexMatch(String[] stringsToMatch, List<String> regexList, boolean expectedResult) {
-        for (String str : stringsToMatch) {
-            assertEquals(expectedResult, StringHelper.isAnyMatching(str, regexList));
-        }
-    }
-
-    @Test
-    public void testCsvToHtmlTable() {
-        String csvText = "ColHeader1, ColHeader2, ColHeader3, ColHeader4" + System.lineSeparator()
-                         + "\"Data 1-1\", \"Data 1\"\"2\", \"Data 1,3\", \"Data 1\"\"\"\"4\"" + System.lineSeparator()
-                         + "Data 2-1, Data 2-2, Data 2-3, \"Data 2-4\"\"\"" + System.lineSeparator()
-                         + "Data 3-1, Data 3-2, Data 3-3, Data 3-4" + System.lineSeparator()
-                         + ",,," + System.lineSeparator()
-                         + ",,,Data 5-4" + System.lineSeparator();
-        String htmlText = StringHelper.csvToHtmlTable(csvText);
-        String expectedHtmlText = "<table class=\"table table-bordered table-striped table-condensed\">"
-                                      + "<tr>"
-                                          + "<td>ColHeader1</td>"
-                                          + "<td> ColHeader2</td>"
-                                          + "<td> ColHeader3</td>"
-                                          + "<td>ColHeader4</td>"
-                                      + "</tr>"
-                                      + "<tr>"
-                                          + "<td>Data 1-1</td>"
-                                          + "<td> Data 1&quot;2</td>"
-                                          + "<td> Data 1,3</td>"
-                                          + "<td>Data 1&quot;&quot;4</td>"
-                                      + "</tr>"
-                                      + "<tr>"
-                                          + "<td>Data 2-1</td>"
-                                          + "<td> Data 2-2</td>"
-                                          + "<td> Data 2-3</td>"
-                                          + "<td>Data 2-4&quot;</td>"
-                                      + "</tr>"
-                                      + "<tr>"
-                                          + "<td>Data 3-1</td>"
-                                          + "<td> Data 3-2</td>"
-                                          + "<td> Data 3-3</td>"
-                                          + "<td>Data 3-4</td>"
-                                      + "</tr>"
-                                      + "<tr>"
-                                          + "<td></td>"
-                                          + "<td></td>"
-                                          + "<td></td>"
-                                          + "<td>Data 5-4</td>"
-                                      + "</tr>"
-                                  + "</table>";
-        assertEquals(expectedHtmlText, htmlText);
-    }
-
-    @Test
-    public void testTrim() {
-        String[] input = {"  apple tea", "banana  ", "   carrot cake      ", "magnesium & hydroxide     -"};
-        String[] expected = {"apple tea", "banana", "carrot cake", "magnesium & hydroxide     -"};
-        assertArrayEquals(expected, StringHelper.trim(input));
-    }
-
-    @Test
-    public void testTrimWithNullString() {
-        String[] input = {"  apple tea", "banana  ", "   carrot cake      ", null};
-        assertThrows(NullPointerException.class, () -> StringHelper.trim(input));
-    }
-
-    @Test
-    public void testToLowerCase() {
-        String[] input = {"thisIsInCamelCase", "anotherInCamelCase", "googleId", "", "alreadylowercase", "ALLUPPERCASE"};
-        String[] expected = {"thisisincamelcase", "anotherincamelcase", "googleid", "", "alreadylowercase", "alluppercase"};
-        assertArrayEquals(expected, StringHelper.toLowerCase(input));
-    }
-
-    @Test
-    public void testRemoveNonAscii() {
-        assertEquals("Hello world!", StringHelper.removeNonAscii("Hello world!"));
-
-        assertEquals("", StringHelper.removeNonAscii("©¡¢â"));
-
-        assertEquals("Coevaluacin Prctica (Part 1)",
-                     StringHelper.removeNonAscii("Coevaluación Práctica (Part 1)"));
-    }
-
-    @Test
-    public void testJoinWithListOfIntegers() {
-        assertEquals("", StringHelper.join(",", new ArrayList<Integer>()));
-        assertEquals("5", StringHelper.join(",", Collections.singletonList(5)));
-        assertEquals("5,14", StringHelper.join(",", Arrays.asList(5, 14)));
-        assertEquals("5||14", StringHelper.join("||", Arrays.asList(5, 14)));
-        assertEquals("5||14||null", StringHelper.join("||", Arrays.asList(5, 14, null)));
-    }
-
-    @Test
-    public void testJoinWithNullElements() {
-        assertThrows(IllegalArgumentException.class, () -> StringHelper.join(",", (List<Integer>) null));
     }
 
     @Test
@@ -484,5 +269,29 @@ public class StringHelperTest extends BaseTestCase {
         assertEquals(StringHelper.extractContentFromQuotedString("data without quotes"), "data without quotes");
         assertEquals(StringHelper.extractContentFromQuotedString(null), null);
         assertEquals(StringHelper.extractContentFromQuotedString(""), "");
+    }
+
+    @Test
+    public void testSignatureGeneration() throws Exception {
+        String data1 = "National University of Singapore";
+        String data2 = "Nanyang Technological University";
+
+        assertEquals(generateSignature(data1), StringHelper.generateSignature(data1));
+
+        assertNotEquals(StringHelper.generateSignature(data1), StringHelper.generateSignature(data2));
+    }
+
+    @Test
+    public void testSignatureVerification() {
+        String valid = "National University of Singapore";
+        String invalid = "Nanyang Technological University";
+        String signature = StringHelper.generateSignature(valid);
+
+        assertTrue(StringHelper.isCorrectSignature(valid, signature));
+
+        assertFalse(StringHelper.isCorrectSignature(valid, invalid));
+        assertFalse(StringHelper.isCorrectSignature(valid, null));
+        assertFalse(StringHelper.isCorrectSignature(null, signature));
+        assertFalse(StringHelper.isCorrectSignature(invalid, signature));
     }
 }

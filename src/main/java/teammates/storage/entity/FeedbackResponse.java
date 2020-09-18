@@ -5,7 +5,6 @@ import java.time.Instant;
 import com.google.appengine.api.datastore.Text;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
-import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.Index;
 import com.googlecode.objectify.annotation.OnSave;
 import com.googlecode.objectify.annotation.Translate;
@@ -22,16 +21,10 @@ import teammates.common.util.Const;
 public class FeedbackResponse extends BaseEntity {
 
     /**
-     * Setting this to true prevents changes to the lastUpdate time stamp. Set
-     * to true when using scripts to update entities when you want to preserve
-     * the lastUpdate time stamp.
-     **/
-    @Ignore
-    public boolean keepUpdateTimestamp;
-
-    // Format is feedbackQuestionId%giverEmail%receiver
-    // i.e. if response is feedback for team: qnId%giver@gmail.com%Team1
-    //         if response is feedback for person: qnId%giver@gmail.com%reciever@email.com
+     * The unique id of the entity.
+     *
+     * @see #generateId(String, String, String)
+     */
     @Id
     private String feedbackResponseId;
 
@@ -83,9 +76,19 @@ public class FeedbackResponse extends BaseEntity {
         this.receiverSection = recipientSection;
         setAnswer(answer);
 
-        this.feedbackResponseId = feedbackQuestionId + "%" + giverEmail + "%" + receiver;
+        this.feedbackResponseId = generateId(feedbackQuestionId, giverEmail, receiver);
 
         this.setCreatedAt(Instant.now());
+    }
+
+    /**
+     * Generates an unique ID for the feedback response.
+     */
+    public static String generateId(String feedbackQuestionId, String giver, String receiver) {
+        // Format is feedbackQuestionId%giverEmail%receiver
+        // i.e. if response is feedback for team: qnId%giver@gmail.com%Team1
+        //         if response is feedback for person: qnId%giver@gmail.com%reciever@email.com
+        return feedbackQuestionId + '%' + giver + '%' + receiver;
     }
 
     public String getId() {
@@ -172,17 +175,21 @@ public class FeedbackResponse extends BaseEntity {
         return updatedAt == null ? Const.TIME_REPRESENTS_DEFAULT_TIMESTAMP : updatedAt;
     }
 
+    /**
+     * Sets the createdAt timestamp of the response.
+     */
     public void setCreatedAt(Instant newDate) {
         this.createdAt = newDate;
         setLastUpdate(newDate);
     }
 
     public void setLastUpdate(Instant newDate) {
-        if (!keepUpdateTimestamp) {
-            this.updatedAt = newDate;
-        }
+        this.updatedAt = newDate;
     }
 
+    /**
+     * Updates the updatedAt timestamp when saving.
+     */
     @OnSave
     public void updateLastUpdateTimestamp() {
         this.setLastUpdate(Instant.now());

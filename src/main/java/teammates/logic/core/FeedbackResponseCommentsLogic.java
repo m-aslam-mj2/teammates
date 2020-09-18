@@ -4,10 +4,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
+import teammates.common.datatransfer.AttributesDeletionQuery;
 import teammates.common.datatransfer.CourseRoster;
 import teammates.common.datatransfer.FeedbackParticipantType;
 import teammates.common.datatransfer.FeedbackResponseCommentSearchResultBundle;
-import teammates.common.datatransfer.TeamDetailsBundle;
 import teammates.common.datatransfer.UserRole;
 import teammates.common.datatransfer.attributes.FeedbackQuestionAttributes;
 import teammates.common.datatransfer.attributes.FeedbackResponseAttributes;
@@ -18,7 +20,6 @@ import teammates.common.datatransfer.attributes.StudentAttributes;
 import teammates.common.exception.EntityAlreadyExistsException;
 import teammates.common.exception.EntityDoesNotExistException;
 import teammates.common.exception.InvalidParametersException;
-import teammates.common.util.Assumption;
 import teammates.storage.api.FeedbackResponseCommentsDb;
 
 /**
@@ -54,32 +55,13 @@ public final class FeedbackResponseCommentsLogic {
      * of the comment is not checked.</p>
      */
     public FeedbackResponseCommentAttributes createFeedbackResponseComment(FeedbackResponseCommentAttributes frComment)
-            throws InvalidParametersException, EntityDoesNotExistException {
+            throws InvalidParametersException, EntityDoesNotExistException, EntityAlreadyExistsException {
         verifyIsCoursePresent(frComment.courseId);
         verifyIsUserOfCourse(frComment.courseId, frComment.commentGiver, frComment.commentGiverType,
                 frComment.isCommentFromFeedbackParticipant);
         verifyIsFeedbackSessionOfCourse(frComment.courseId, frComment.feedbackSessionName);
 
-        try {
-            return frcDb.createFeedbackResponseComment(frComment);
-        } catch (EntityAlreadyExistsException e) {
-            try {
-
-                FeedbackResponseCommentAttributes existingComment =
-                                  frcDb.getFeedbackResponseComment(frComment.feedbackResponseId, frComment.commentGiver,
-                                                                   frComment.createdAt);
-                if (existingComment == null) {
-                    existingComment = frcDb.getFeedbackResponseComment(frComment.courseId, frComment.createdAt,
-                                                                       frComment.commentGiver);
-                }
-                frComment.setId(existingComment.getId());
-
-                return frcDb.updateFeedbackResponseComment(frComment);
-            } catch (Exception ex) {
-                Assumption.fail();
-                return null;
-            }
-        }
+        return frcDb.createEntity(frComment);
     }
 
     public FeedbackResponseCommentAttributes getFeedbackResponseComment(Long feedbackResponseCommentId) {
@@ -95,28 +77,47 @@ public final class FeedbackResponseCommentsLogic {
         return frcDb.getFeedbackResponseCommentsForResponse(feedbackResponseId);
     }
 
-    public List<FeedbackResponseCommentAttributes> getFeedbackResponseCommentForSession(String courseId,
-                                                                                        String feedbackSessionName) {
-        return frcDb.getFeedbackResponseCommentsForSession(courseId, feedbackSessionName);
+    /**
+     * Gets comment associated with the response.
+     *
+     * <p>The comment is given by a feedback participant to explain the response</p>
+     *
+     * @param feedbackResponseId the response id
+     */
+    public FeedbackResponseCommentAttributes getFeedbackResponseCommentForResponseFromParticipant(
+            String feedbackResponseId) {
+        return frcDb.getFeedbackResponseCommentForResponseFromParticipant(feedbackResponseId);
     }
 
-    public List<FeedbackResponseCommentAttributes> getFeedbackResponseCommentForSessionInSection(String courseId,
-                                                           String feedbackSessionName, String section) {
+    /**
+     * Gets all feedback response comments for session in a section.
+     *
+     * @param courseId the course ID of the feedback session
+     * @param feedbackSessionName the feedback session name
+     * @param section if null, will retrieve all comments in the session
+     * @return a list of feedback response comments
+     */
+    public List<FeedbackResponseCommentAttributes> getFeedbackResponseCommentForSessionInSection(
+            String courseId, String feedbackSessionName, @Nullable String section) {
         if (section == null) {
-            return getFeedbackResponseCommentForSession(courseId, feedbackSessionName);
+            return frcDb.getFeedbackResponseCommentsForSession(courseId, feedbackSessionName);
         }
         return frcDb.getFeedbackResponseCommentsForSessionInSection(courseId, feedbackSessionName, section);
     }
 
-    public void updateFeedbackResponseCommentsForChangingResponseId(
-            String oldResponseId, String newResponseId)
-            throws InvalidParametersException, EntityDoesNotExistException {
-        List<FeedbackResponseCommentAttributes> responseComments =
-                getFeedbackResponseCommentForResponse(oldResponseId);
-        for (FeedbackResponseCommentAttributes responseComment : responseComments) {
-            responseComment.feedbackResponseId = newResponseId;
-            updateFeedbackResponseComment(responseComment);
+    /**
+     * Gets all feedback response comments for a question in a section.
+     *
+     * @param questionId the ID of the question
+     * @param section if null, will retrieve all comments for the question
+     * @return a list of feedback response comments
+     */
+    public List<FeedbackResponseCommentAttributes> getFeedbackResponseCommentForQuestionInSection(
+            String questionId, @Nullable String section) {
+        if (section == null) {
+            return frcDb.getFeedbackResponseCommentsForQuestion(questionId);
         }
+        return frcDb.getFeedbackResponseCommentsForQuestionInSection(questionId, section);
     }
 
     /*
@@ -133,23 +134,27 @@ public final class FeedbackResponseCommentsLogic {
         List<FeedbackResponseCommentAttributes> comments = getFeedbackResponseCommentForResponse(feedbackResponseId);
         FeedbackResponseAttributes response = frLogic.getFeedbackResponse(feedbackResponseId);
         for (FeedbackResponseCommentAttributes comment : comments) {
-            comment.giverSection = response.giverSection;
-            comment.receiverSection = response.recipientSection;
-            frcDb.updateFeedbackResponseComment(comment);
+            frcDb.updateFeedbackResponseComment(
+                    FeedbackResponseCommentAttributes.updateOptionsBuilder(comment.getId())
+                            .withGiverSection(response.giverSection)
+                            .withReceiverSection(response.recipientSection)
+                            .build()
+            );
         }
     }
 
-    public FeedbackResponseCommentAttributes updateFeedbackResponseComment(
-                                                     FeedbackResponseCommentAttributes feedbackResponseComment)
-                                                     throws InvalidParametersException, EntityDoesNotExistException {
-        return frcDb.updateFeedbackResponseComment(feedbackResponseComment);
-    }
-
     /**
-     * Creates or updates document for the given comment.
+     * Updates a feedback response comment by {@link FeedbackResponseCommentAttributes.UpdateOptions}.
+     *
+     * @return updated comment
+     * @throws InvalidParametersException if attributes to update are not valid
+     * @throws EntityDoesNotExistException if the comment cannot be found
      */
-    public void putDocument(FeedbackResponseCommentAttributes comment) {
-        frcDb.putDocument(comment);
+    public FeedbackResponseCommentAttributes updateFeedbackResponseComment(
+            FeedbackResponseCommentAttributes.UpdateOptions updateOptions)
+            throws InvalidParametersException, EntityDoesNotExistException {
+
+        return frcDb.updateFeedbackResponseComment(updateOptions);
     }
 
     /**
@@ -169,23 +174,18 @@ public final class FeedbackResponseCommentsLogic {
         return frcDb.search(queryString, instructors);
     }
 
-    public void deleteFeedbackResponseCommentsForCourse(String courseId) {
-        frcDb.deleteFeedbackResponseCommentsForCourse(courseId);
-    }
-
-    public void deleteFeedbackResponseCommentsForResponse(String responseId) {
-        frcDb.deleteFeedbackResponseCommentsForResponse(responseId);
-    }
-
-    public void deleteFeedbackResponseCommentById(Long commentId) {
-        frcDb.deleteCommentById(commentId);
+    /**
+     * Deletes a comment.
+     */
+    public void deleteFeedbackResponseComment(long commentId) {
+        frcDb.deleteFeedbackResponseComment(commentId);
     }
 
     /**
-     * Removes document for the comment with given id.
+     * Deletes comments using {@link AttributesDeletionQuery}.
      */
-    public void deleteDocumentByCommentId(long commentId) {
-        frcDb.deleteDocumentByCommentId(commentId);
+    public void deleteFeedbackResponseComments(AttributesDeletionQuery query) {
+        frcDb.deleteFeedbackResponseComments(query);
     }
 
     /**
@@ -303,7 +303,8 @@ public final class FeedbackResponseCommentsLogic {
                 (relatedQuestion.giverType == FeedbackParticipantType.TEAMS
                 || isResponseCommentVisibleTo(relatedQuestion, relatedComment,
                                               FeedbackParticipantType.OWN_TEAM_MEMBERS))
-                && studentsEmailInTeam.contains(response.giver);
+                && (studentsEmailInTeam.contains(response.giver)
+                        || (isUserStudent && student.getTeam().equals(response.giver)));
 
         boolean isUserInResponseRecipientTeamAndRelatedResponseCommentVisibleToRecipientsTeamMembers =
                 isResponseCommentVisibleTo(relatedQuestion, relatedComment,
@@ -392,10 +393,10 @@ public final class FeedbackResponseCommentsLogic {
             }
             break;
         case TEAMS:
-            List<TeamDetailsBundle> teams = coursesLogic.getTeamsForCourse(courseId);
+            List<String> teams = coursesLogic.getTeamsForCourse(courseId);
             boolean isTeamPresentInCourse = false;
-            for (TeamDetailsBundle team : teams) {
-                if (team.name.equals(commentGiver)) {
+            for (String team : teams) {
+                if (team.equals(commentGiver)) {
                     isTeamPresentInCourse = true;
                     break;
                 }

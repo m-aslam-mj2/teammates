@@ -8,10 +8,10 @@ import teammates.common.util.Const;
 import teammates.test.pageobjects.InstructorFeedbackResultsPage;
 
 /**
- * SUT: {@link Const.ActionURIs#INSTRUCTOR_FEEDBACK_RESULTS_PAGE},
+ * SUT: {@link Const.WebPageURIs#INSTRUCTOR_SESSION_RESULTS_PAGE},
  *      specifically for feedback response comments.
  */
-public class InstructorFeedbackResultsPageResponseCommentUiTest extends BaseUiTestCase {
+public class InstructorFeedbackResultsPageResponseCommentUiTest extends BaseLegacyUiTestCase {
 
     @Override
     protected void prepareTestData() {
@@ -235,11 +235,11 @@ public class InstructorFeedbackResultsPageResponseCommentUiTest extends BaseUiTe
     }
 
     private InstructorFeedbackResultsPage loginToInstructorFeedbackResultsPage(String instructorName, String fsName) {
-        AppUrl resultsUrl = createUrl(Const.ActionURIs.INSTRUCTOR_FEEDBACK_RESULTS_PAGE)
+        AppUrl resultsUrl = createUrl(Const.WebPageURIs.INSTRUCTOR_SESSION_RESULTS_PAGE)
                 .withUserId(testData.instructors.get(instructorName).googleId)
                 .withCourseId(testData.feedbackSessions.get(fsName).getCourseId())
                 .withSessionName(testData.feedbackSessions.get(fsName).getFeedbackSessionName());
-        return loginAdminToPage(resultsUrl, InstructorFeedbackResultsPage.class);
+        return loginAdminToPageOld(resultsUrl, InstructorFeedbackResultsPage.class);
     }
 
     private void addEmptyCommentToResponseAndCheckStatusMessage(String commentModelId,

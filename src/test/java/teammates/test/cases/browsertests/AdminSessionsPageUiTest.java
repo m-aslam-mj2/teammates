@@ -13,9 +13,9 @@ import teammates.common.util.Const;
 import teammates.test.pageobjects.AdminSessionsPage;
 
 /**
- * SUT: {@link Const.ActionURIs#ADMIN_SESSIONS_PAGE}.
+ * SUT: {@link Const.WebPageURIs#ADMIN_SESSIONS_PAGE}.
  */
-public class AdminSessionsPageUiTest extends BaseUiTestCase {
+public class AdminSessionsPageUiTest extends BaseLegacyUiTestCase {
     private AdminSessionsPage sessionsPage;
 
     @Override
@@ -37,8 +37,8 @@ public class AdminSessionsPageUiTest extends BaseUiTestCase {
 
         ______TS("content: typical page");
 
-        AppUrl sessionsUrl = createUrl(Const.ActionURIs.ADMIN_SESSIONS_PAGE);
-        sessionsPage = loginAdminToPage(sessionsUrl, AdminSessionsPage.class);
+        AppUrl sessionsUrl = createUrl(Const.WebPageURIs.ADMIN_SESSIONS_PAGE);
+        sessionsPage = loginAdminToPageOld(sessionsUrl, AdminSessionsPage.class);
         By timeFramePanel = By.id("timeFramePanel");
         sessionsPage.waitForElementToDisappear(timeFramePanel);
         assertTrue(isSessionDataDisplayCorrect());

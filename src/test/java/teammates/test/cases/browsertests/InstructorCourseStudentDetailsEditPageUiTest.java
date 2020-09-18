@@ -12,9 +12,9 @@ import teammates.test.pageobjects.InstructorCourseDetailsPage;
 import teammates.test.pageobjects.InstructorCourseStudentDetailsEditPage;
 
 /**
- * SUT: {@link Const.ActionURIs#INSTRUCTOR_COURSE_STUDENT_DETAILS_EDIT}.
+ * SUT: {@link Const.WebPageURIs#INSTRUCTOR_COURSE_STUDENT_DETAILS_EDIT_PAGE}.
  */
-public class InstructorCourseStudentDetailsEditPageUiTest extends BaseUiTestCase {
+public class InstructorCourseStudentDetailsEditPageUiTest extends BaseLegacyUiTestCase {
     private InstructorCourseStudentDetailsEditPage editPage;
 
     @Override
@@ -38,22 +38,22 @@ public class InstructorCourseStudentDetailsEditPageUiTest extends BaseUiTestCase
 
         ______TS("content: unregistered student");
 
-        AppUrl editPageUrl = createUrl(Const.ActionURIs.INSTRUCTOR_COURSE_STUDENT_DETAILS_EDIT)
+        AppUrl editPageUrl = createUrl(Const.WebPageURIs.INSTRUCTOR_COURSE_STUDENT_DETAILS_EDIT_PAGE)
                                         .withUserId(instructorId)
                                         .withCourseId(courseId)
                                         .withStudentEmail(testData.students.get("unregisteredStudent").email);
 
-        editPage = loginAdminToPage(editPageUrl, InstructorCourseStudentDetailsEditPage.class);
+        editPage = loginAdminToPageOld(editPageUrl, InstructorCourseStudentDetailsEditPage.class);
         editPage.verifyHtmlMainContent("/instructorCourseStudentEditUnregisteredPage.html");
 
         ______TS("content: registered student");
 
-        editPageUrl = createUrl(Const.ActionURIs.INSTRUCTOR_COURSE_STUDENT_DETAILS_EDIT)
+        editPageUrl = createUrl(Const.WebPageURIs.INSTRUCTOR_COURSE_STUDENT_DETAILS_EDIT_PAGE)
             .withUserId(instructorId)
             .withCourseId(courseId)
             .withStudentEmail(testData.students.get("registeredStudent").email);
 
-        editPage = loginAdminToPage(editPageUrl, InstructorCourseStudentDetailsEditPage.class);
+        editPage = loginAdminToPageOld(editPageUrl, InstructorCourseStudentDetailsEditPage.class);
 
         // This is the full HTML verification for Instructor Course Student Edit Page, the rest can all be verifyMainHtml
         editPage.verifyHtml("/instructorCourseStudentEditPage.html");
